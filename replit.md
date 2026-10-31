@@ -34,7 +34,15 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Für BrickBuilder Mobile gilt: „Ja, alle Änderungen immer übernehmen.“
+  Nach abgeschlossenen Codeänderungen und übernommenen Aufgaben den neuen
+  Code-Stand ohne erneute Nachfrage in
+  `https://github.com/Blackfishbox/BrickBuilder-Mobile` auf `main` sichern.
+- Dafür `bash scripts/backup-github.sh` ausführen. Aufgabenübernahmen rufen
+  dieses Skript über den Post-Merge-Ablauf auf.
+- Private Uploads, lokale Agent-Notizen, Umgebungsdateien und Build-Ausgaben
+  bleiben ausgeschlossen. Die Zustimmung betrifft Codebackups, keine
+  Veröffentlichungen.
 
 ## Gotchas
 
