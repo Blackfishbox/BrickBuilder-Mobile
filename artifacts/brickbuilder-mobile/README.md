@@ -45,12 +45,62 @@ nicht physisch geprüft. Ebenso steht ein tatsächlicher Flugmodus-Test im
 installierten Browser noch aus; die Offline-Erzeugung und der Cache-Inhalt des
 Produktionsbuilds wurden geprüft, nicht ein vollständiger Offline-Browserlauf.
 
+## Modellimport und Dateiformate
+
+Unter **Projektmenü → Datei importieren / exportieren** lässt sich eine lokale
+IO-, LDR-, MPD- oder JSON-Datei auswählen. Nach der Prüfung zeigt eine Vorschau
+Instanzenzahl, Teile, Farben und Hinweise. Erst **Neues Projekt aus Import
+anlegen** speichert und öffnet ein neues Projekt; das vorherige Modell bleibt
+erhalten. Ein Fehler beim Lesen oder Speichern ersetzt kein bestehendes Projekt.
+Ein Hinweis über dem Modell öffnet den dauerhaft gespeicherten Importbericht.
+
+Mit der bereitgestellten privaten Studio-Datei nachgewiesen: **429 Instanzen,
+74 verschiedene externe Teile und acht effektive Farben**, Untermodelle und
+vollständige affine Transformationen. Alle 74 Original-LDraw-Teilegeometrien
+einschließlich ihrer rekursiven Abhängigkeiten sind renderbar. Diese Dateianalyse
+und die Tests sind kein Versprechen allgemeiner Studio-Kompatibilität.
+
+LDraw- und BrickLink-Farbnummern sowie Namen werden getrennt angezeigt.
+Studio-IDs und nicht bestätigte BrickLink-Teilenummern werden nicht geraten.
+Fehlende Geometrien werden mit Referenz und Anzahl im Bericht ausgewiesen,
+unbekannte Farben mit Warnfarbe Magenta. Keine stillen Ersatzsteine.
+
+Originalupload, Untermodellquelle, Zusatzdaten im IO-Archiv, verwendete
+LDraw-Dateien, Credits und Lizenztexte werden im lokalen Projekt erhalten.
+Nach erfolgreichem Import benötigt das Wiederöffnen keine Netzwerkverbindung.
+Der zusätzliche Geometriesnapshot wird bei Bedarf beim Import geladen, nicht
+beim App-Start. Das bestehende Paket-/Katalogsystem wird nicht verändert.
+Importierte Instanzen sind schreibgeschützt; Baukastensteine bleiben bearbeitbar.
+
+Der mobile Browserablauf wurde mit der echten Referenz geprüft: sichtbares
+zusammengesetztes Auto, Speicherung, Neuladen, erneutes Öffnen ohne
+Geometriedownload sowie unverändertes vorheriges Projekt bei Importfehlern.
+Ein physischer Android-/Flugmodus-Test und ein Vergleich gegen Studio fehlen
+weiterhin.
+
+Getrennte Adapter:
+
+| Format | Import | Export / tatsächlicher Teststand |
+| --- | --- | --- |
+| Internes JSON v1 | Strukturvalidierung; bestehende v1-Projekte bleiben gültig | Vollständige lokale Sicherung einschließlich Importdaten; Roundtrip getestet |
+| LDR | Typ-1-Referenzen, volle Matrizen; fehlende Ressourcen als Hinweise | Aufgelöstes flaches Modell; Matrizen/Farben der echten Referenz im Roundtrip getestet |
+| MPD | FILE-Untermodelle, Namen mit Leerzeichen, Farbvererbung | Unveränderte Quelle bei reinem Importmodell; sonst flacher main.ldr-Abschnitt |
+| IO | Unverschlüsseltes ZIP32 mit UTF-8/ASCII-Dateinamen und model.ldr | Minimaler neuer ZIP-Container mit model.ldr und .info; nur im eigenen Importer getestet, keine Studio-Exportkompatibilität behauptet |
+
+Containergrenzen: maximal 32 MiB Upload/entpackte Summe, 16 MiB je ZIP-Eintrag,
+128 Archiveinträge, 1.024 Untermodelle, 48 Hierarchieebenen, 10.000 Instanzen.
+Mehrteilige, verschlüsselte und ZIP64-Archive werden abgelehnt. CRC, Größen und
+Pfadgrenzen werden vor/nach dem Entpacken geprüft; keine Dateisystemextraktion.
+Geometriedetails, Grenzen und Quellenprüfung:
+[`docs/io-reference-analysis.md`](docs/io-reference-analysis.md) und
+[`docs/import-geometry-licensing.md`](docs/import-geometry-licensing.md).
+
 ## Noch nicht enthalten
 
-- Original-LDraw-Geometrien im 3D-Editor (die Bibliothek ist lokal durchsuchbar;
-  aktuell bleiben nur die drei prozedural unterstützten Formen platzierbar).
-- BrickLink-IDs, Farbmapping, Preise oder Verfügbarkeitsdaten.
-- Import/Export für LDR, MPD oder IO. Es gibt keine behauptete Dateikompatibilität.
+- Beliebige LDraw-Teile aktiv platzieren oder importierte Instanzen bearbeiten.
+- Vollständiger BrickLink-Teilenummernkatalog, Preise oder Verfügbarkeitsdaten.
+- Allgemeine Studio-Kompatibilität, Texturen, Anleitungen, BFC-/Typ-5-Kanten,
+  physikalisch korrekte Metallic-/Transparenzdarstellung.
 - Mehrfachauswahl, Langzeitmessungen mit tausenden Steinen oder Cloud-Sync.
 - Physischer Android-Abnahmetest.
 

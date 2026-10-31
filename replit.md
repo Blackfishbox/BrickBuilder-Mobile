@@ -40,6 +40,10 @@ _Describe the high-level user-facing capabilities of this app once they exist._
   `https://github.com/Blackfishbox/BrickBuilder-Mobile` auf `main` sichern.
 - Dafür `bash scripts/backup-github.sh` ausführen. Aufgabenübernahmen rufen
   dieses Skript über den Post-Merge-Ablauf auf.
+- Der Post-Merge-Prozess kann ohne Git-Zugang laufen. Ein fehlgeschlagenes
+  Backup wird dann unter `.local/github-backup-pending.json` vermerkt, ohne
+  den App-Start zu blockieren. Nach der Übernahme den ausstehenden Stand
+  aus der autorisierten Agent-Arbeitsumgebung sichern und Erfolg prüfen.
 - Private Uploads, lokale Agent-Notizen, Umgebungsdateien und Build-Ausgaben
   bleiben ausgeschlossen. Die Zustimmung betrifft Codebackups, keine
   Veröffentlichungen.

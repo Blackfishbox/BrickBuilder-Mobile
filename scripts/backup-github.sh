@@ -8,6 +8,7 @@ REPOSITORY="https://github.com/Blackfishbox/BrickBuilder-Mobile.git"
 BRANCH_REF="refs/heads/main"
 TRACKING_REF="refs/brickbuilder-backup/main"
 export GIT_TERMINAL_PROMPT=0
+PENDING_STATUS="$ROOT/.local/github-backup-pending.json"
 
 # Use a separate index and reference; leave the workspace branch/index intact.
 GIT_DIRECTORY=$(git rev-parse --git-dir)
@@ -102,6 +103,7 @@ PARENT_ARGUMENTS=()
 if [[ -n "$REMOTE_COMMIT" ]]; then
   PREVIOUS_TREE=$(git show -s --format=%T "$REMOTE_COMMIT")
   if [[ "$TREE" == "$PREVIOUS_TREE" ]]; then
+    rm -f -- "$PENDING_STATUS"
     echo "GitHub backup is already up to date."
     exit 0
   fi
@@ -120,4 +122,5 @@ if [[ "$VERIFIED" != "$COMMIT" ]]; then
   exit 1
 fi
 git update-ref "$TRACKING_REF" "$COMMIT"
+rm -f -- "$PENDING_STATUS"
 echo "GitHub backup verified: $COMMIT"

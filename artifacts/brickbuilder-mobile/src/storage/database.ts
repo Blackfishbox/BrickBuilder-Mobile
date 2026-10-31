@@ -44,6 +44,17 @@ export async function saveProject(document: BuilderDocument): Promise<void> {
   });
 }
 
+/** Single transaction protects both the previous model and active project pointer. */
+export async function createImportedProject(previous: BuilderDocument, imported: BuilderDocument): Promise<void> {
+  if (previous.id === imported.id) throw new Error("Import muss ein neues Projekt anlegen.");
+  await builderDatabase.transaction("rw", builderDatabase.projects, builderDatabase.metadata, async () => {
+    if (await builderDatabase.projects.get(imported.id)) throw new Error("Projekt-ID bereits vorhanden.");
+    await builderDatabase.projects.put(previous);
+    await builderDatabase.projects.add(imported);
+    await builderDatabase.metadata.put({ key: "activeProjectId", value: imported.id });
+  });
+}
+
 export async function loadCurrentProject(): Promise<BuilderDocument | null> {
   const active = await builderDatabase.metadata.get("activeProjectId");
   if (active) {

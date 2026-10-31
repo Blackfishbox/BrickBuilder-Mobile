@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   BoxGeometry,
+  Box3,
   BufferGeometry,
   Color,
   CylinderGeometry,
@@ -27,6 +28,9 @@ import {
   WebGLRenderer,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { compilePart, createImportedGroup, worldMatrix } from "./ldraw-geometry";
+import { resolveColor } from "../formats/colors";
+import type { ImportedModel } from "../formats/types";
 
 import {
   BRICK_DEFINITIONS,
@@ -40,6 +44,7 @@ import {
 
 interface BuilderCanvasProps {
   bricks: Brick[];
+  imported?: ImportedModel;
   selectedId: string | null;
   selectedType: BrickType;
   selectedColor: string;
@@ -109,6 +114,8 @@ class FallbackRenderer {
     target: Vector3,
     bricks: Brick[],
     selectedId: string | null,
+    imported?: ImportedModel,
+    importOffset = 0,
   ): void {
     const context = this.context;
     if (!context) return;
@@ -166,6 +173,43 @@ class FallbackRenderer {
       }
     }
     context.restore();
+
+    // Exact LDraw triangles in the software renderer, not replacement boxes.
+    if (imported) {
+      const faces: { points: ProjectedPoint[]; depth: number; color: string; alpha: number }[] = [];
+      const vertex = new Vector3();
+      const light = new Vector3(-0.4, 0.8, 0.5).normalize();
+      for (const instance of imported.instances) {
+        if (instance.part.status !== "resolved") continue;
+        const matrix = worldMatrix(instance.matrix);
+        matrix.elements[13] += importOffset;
+        for (const surface of compilePart(imported, instance.reference, instance.colorCode)) {
+          const mapping = resolveColor(surface.colorCode);
+          const color = new Color(mapping?.hex ?? "#ff00ff");
+          for (let index = 0; index < surface.positions.length; index += 9) {
+            const world = [];
+            for (let v = 0; v < 9; v += 3) {
+              world.push(vertex.fromArray(surface.positions, index + v).applyMatrix4(matrix).clone());
+            }
+            const points = world.map(p => project(p.x, p.y, p.z));
+            if (points.some(p => p.depth < 0.1)) continue;
+            const area = (points[1].x - points[0].x) * (points[2].y - points[0].y) - (points[1].y - points[0].y) * (points[2].x - points[0].x);
+            if (Math.abs(area) < 0.08) continue;
+            const normal = world[1].clone().sub(world[0]).cross(world[2].clone().sub(world[0])).normalize();
+            const shade = 0.6 + 0.4 * Math.abs(normal.dot(light));
+            faces.push({ points, depth: points.reduce((s, p) => s + p.depth, 0) / 3, color: color.clone().multiplyScalar(shade).getStyle(), alpha: (mapping?.alpha ?? 255) / 255 });
+          }
+        }
+      }
+      faces.sort((a, b) => b.depth - a.depth);
+      for (const face of faces) {
+        polygonPath(context, face.points);
+        context.globalAlpha = face.alpha;
+        context.fillStyle = face.color;
+        context.fill();
+      }
+      context.globalAlpha = 1;
+    }
 
     const orderedBricks = [...bricks].sort(
       (first, second) =>
@@ -330,6 +374,22 @@ function makeCameraPosition(
   camera.lookAt(target);
 }
 
+function fitImportedView(
+  camera: PerspectiveCamera,
+  root: Group,
+  state: { target: Vector3; distance: number; theta: number; phi: number },
+): void {
+  const bounds = new Box3().setFromObject(root);
+  if (bounds.isEmpty()) return;
+  bounds.getCenter(state.target);
+  // Fit the bounding sphere against the narrower field of view, including portrait.
+  const halfVertical = camera.fov * Math.PI / 360;
+  const halfHorizontal = Math.atan(Math.tan(halfVertical) * camera.aspect);
+  const radius = bounds.getSize(new Vector3()).length() / 2;
+  state.distance = Math.max(8, radius / Math.sin(Math.min(halfVertical, halfHorizontal)) * 1.08);
+  makeCameraPosition(camera, state.target, state.theta, state.phi, state.distance);
+}
+
 function getFootprint(brick: Brick) {
   const definition = BRICK_DEFINITIONS[brick.type];
   const swapped = Math.abs(brick.rotation % 180) === 90;
@@ -352,6 +412,7 @@ function pointerDistance(first: PointerPoint, second: PointerPoint): number {
 
 export function BuilderCanvas({
   bricks,
+  imported,
   selectedId,
   selectedType,
   selectedColor,
@@ -365,10 +426,13 @@ export function BuilderCanvas({
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const rendererRef = useRef<WebGLRenderer | FallbackRenderer | null>(null);
   const brickRootRef = useRef<Group | null>(null);
+  const importedRootRef = useRef<Group | null>(null);
+  const importedOffsetRef = useRef(0);
   const invalidatorRef = useRef<(() => void) | null>(null);
   const raycasterRef = useRef(new Raycaster());
   const propsRef = useRef({
     bricks,
+    imported,
     selectedId,
     selectedType,
     selectedColor,
@@ -393,6 +457,7 @@ export function BuilderCanvas({
 
   propsRef.current = {
     bricks,
+    imported,
     selectedId,
     selectedType,
     selectedColor,
@@ -408,7 +473,7 @@ export function BuilderCanvas({
 
     const scene = new Scene();
     scene.background = new Color("#eef1ec");
-    const camera = new PerspectiveCamera(42, 1, 0.1, 180);
+    const camera = new PerspectiveCamera(42, 1, 0.1, 4000);
     let renderer: WebGLRenderer | FallbackRenderer;
     const renderCanvas = document.createElement("canvas");
     const webglContext = renderCanvas.getContext("webgl2", {
@@ -492,6 +557,8 @@ export function BuilderCanvas({
             cameraStateRef.current.target,
             propsRef.current.bricks,
             propsRef.current.selectedId,
+            propsRef.current.imported,
+            importedOffsetRef.current,
           );
         }
       });
@@ -504,6 +571,7 @@ export function BuilderCanvas({
       setRendererSize(renderer, width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      if (importedRootRef.current) fitImportedView(camera, importedRootRef.current, cameraStateRef.current);
       invalidate();
     });
     resizeObserver.observe(host);
@@ -530,6 +598,42 @@ export function BuilderCanvas({
       brickRootRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!scene || !camera) return;
+    const previous = importedRootRef.current;
+    if (previous) { scene.remove(previous); disposeImported(previous); }
+    importedRootRef.current = null;
+    importedOffsetRef.current = 0;
+    if (imported) {
+      const root = createImportedGroup(imported);
+      const bounds = new Box3().setFromObject(root);
+      if (!bounds.isEmpty()) {
+        const offset = Math.max(0, -bounds.min.y);
+        root.position.y = offset;
+        importedOffsetRef.current = offset;
+        bounds.translate(new Vector3(0, offset, 0));
+        const rectangle = hostRef.current?.getBoundingClientRect();
+        if (rectangle && rectangle.height > 0) {
+          camera.aspect = rectangle.width / rectangle.height;
+          camera.updateProjectionMatrix();
+        }
+        fitImportedView(camera, root, cameraStateRef.current);
+      }
+      scene.add(root);
+      importedRootRef.current = root;
+    }
+    invalidatorRef.current?.();
+    return () => {
+      if (importedRootRef.current) {
+        scene.remove(importedRootRef.current);
+        disposeImported(importedRootRef.current);
+        importedRootRef.current = null;
+      }
+    };
+  }, [imported]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -614,7 +718,7 @@ export function BuilderCanvas({
       const cameraState = cameraStateRef.current;
       cameraState.theta = theta;
       cameraState.phi = Math.max(0.25, Math.min(1.42, phi));
-      cameraState.distance = Math.max(6, Math.min(42, distance));
+      cameraState.distance = Math.max(3, Math.min(1500, distance));
       cameraState.target.copy(target);
       const camera = cameraRef.current;
       if (!camera) return;
@@ -861,6 +965,19 @@ export function BuilderCanvas({
 
 function geometryCacheHas(geometry: InstancedMesh["geometry"]): boolean {
   return [...geometryCache.values()].some((cached) => cached === geometry);
+}
+
+function disposeImported(root: Group): void {
+  const geometries = new Set<BufferGeometry>();
+  const materials = new Set<Material>();
+  root.traverse(object => {
+    if (object instanceof Mesh || object instanceof LineSegments) {
+      geometries.add(object.geometry);
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
+    }
+  });
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) material.dispose();
 }
 
 function setRendererSize(

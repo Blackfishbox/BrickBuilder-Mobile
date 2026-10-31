@@ -86,10 +86,59 @@ Formatkenntnis kein Ersatz für die rekursive Teilezählung aus `model.ldr`.
 Zusatzdaten möglichst unverändert als Quelldaten erhalten, aber nicht als
 bereits unterstützte Bearbeitungsfunktionen ausgeben.
 
-## Noch nachzuweisen
+## Nachweis im implementierten Adapter
 
-- Importiert die Anwendung tatsächlich 429 Instanzen?
-- Stimmen Geometrie, Transformationen und Farben visuell mit Studio überein?
-- Bleiben Untermodelle und unbekannte Metadaten nach lokaler Speicherung erhalten?
-- Werden fehlende Teile und Farbzuordnungen nachvollziehbar angezeigt?
-- Übersteht das importierte Projekt einen Neustart ohne Netzwerk?
+Der automatisierte Referenztest liest die private Upload-Datei direkt; sie wird
+nicht als öffentliche Fixture oder in den App-Build kopiert.
+
+- 429 erhaltene Instanzen, 74 externe Referenzen, neun FILE-Abschnitte.
+- Die oben aufgeführten acht effektiven Farbcodes und Häufigkeiten stimmen.
+- Alle 429 Instanzen verwenden auflösbare Original-LDraw-Geometrien.
+  Ein separater, hashgebundener Snapshot enthält 74 Hauptteile und insgesamt
+  321 geprüfte Originaldateien (98.923 Bytes gzip).
+- Die Geometrien stammen aus der offiziellen LDraw-Bibliothek, nicht aus
+  `model2.ldr`. Unterteil- und Primitivreferenzen werden rekursiv aufgelöst.
+- Vollständige 3×4-Matrizen inklusive Spiegelung, Skalierung und Scherung bleiben
+  erhalten. Einheiten: 20 LDU = eine Noppe; Y wird für die Anzeige invertiert.
+- JSON-Sicherung und lokales Wiederöffnen erhalten Originalarchiv, Untermodelle,
+  Matrizen, Ressourcen, Lizenztexte und Hinweise ohne weiteren Download.
+- Die acht LDraw-Farben haben ausdrücklich getrennte BrickLink-Farbzuordnungen;
+  nicht bestätigte BrickLink- und Studio-Teilenummern bleiben leer.
+- Beschädigte Archive, unsichere Pfade, Zyklen, ungültige Matrizen und simulierte
+  Speicherfehler sind geprüft. Fehlgeschlagene Transaktionen ändern weder
+  bestehende Projekte noch den aktiven Projektverweis.
+- LDR-Export erhält die aufgelösten Matrizen/Farben, MPD die unveränderte
+  Untermodellquelle, solange keine Baukastensteine ergänzt wurden. Minimaler
+  IO-Export wird im eigenen Importer wieder eingelesen; dies ist **kein Nachweis
+  des Öffnens in BrickLink Studio**.
+
+## Visuelle und fachliche Grenzen
+
+Im mobilen Browserablauf (402×874) wurde das zusammengesetzte Auto sichtbar
+gerendert. Die Vorschau meldete 429/74/8 und ausschließlich die erwarteten
+Hinweise zu unbestätigten BrickLink-Teilenummern und zur IO-Unterstützungsgrenze.
+Nach Neuladen und erneutem Öffnen bei blockierter Geometrie-Downloadroute
+blieb die Geometrie ohne erneuten Request verfügbar. Ein vorheriges Projekt
+mit einem Stein blieb unverändert erhalten; beschädigter IO-Upload zeigte
+einen Fehler, ohne es zu ersetzen.
+
+Kein visueller Pixel-/Geometrievergleich gegen eine Studio-Referenzansicht:
+eine solche Ansicht wurde nicht mitgeliefert. Keine Behauptung allgemeiner
+IO-Kompatibilität oder physisch korrekter LEGO-Verbindungen.
+
+Die Darstellung unterstützt LDraw-Typen 1–4 (Typ 1 rekursiv, Quads trianguliert).
+Typ-5-Kanten sind nicht implementiert. BFC-Culling wird nicht rekonstruiert;
+Flächen sind doppelseitig, Normale flach pro Dreieck. TEXMAP und Studio-Texturen,
+Materialeffekte wie Metallic/Perlglanz, Anleitungen und proprietäre Zusatzdaten
+sind keine unterstützten Bearbeitungsfunktionen. Transparenz wird angenähert.
+Diese Einschränkungen ändern die erhaltenen Quelldaten nicht.
+
+Importierte Instanzen sind als Modellansicht bewusst schreibgeschützt; die
+bisherigen Baukastensteine können daneben weiterhin bearbeitet werden.
+Eine rein visuelle Höhenkorrektur verhindert, dass das Modell unter der
+Grundplatte verschwindet; Quellmatrizen werden dadurch nicht verändert.
+
+Weiter offen bleiben:
+
+- Bestätigung der sichtbaren Übereinstimmung mit Studio.
+- Physischer Android-Abnahmetest einschließlich Flugmodus und Speicherverdrängung.

@@ -1,3 +1,5 @@
+import type { ImportedModel } from "../formats/types";
+
 export type BrickType = "brick-2x4" | "brick-2x2" | "brick-1x2";
 export type ToolMode = "build" | "select" | "delete";
 
@@ -25,6 +27,7 @@ export interface BuilderDocument {
   updatedAt: string;
   bricks: Brick[];
   metadata: Record<string, unknown>;
+  imported?: ImportedModel;
 }
 
 export interface BrickDefinition {
@@ -100,5 +103,6 @@ export function normalizeDocument(
       typeof document.metadata === "object" && document.metadata !== null
         ? document.metadata
         : {},
+    ...(document.imported ? { imported: document.imported } : {}),
   };
 }

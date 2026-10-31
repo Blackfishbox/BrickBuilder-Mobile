@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import '@/components/mobile/editor.css';
 import PartsLibrary from '@/features/parts/PartsLibrary';
+import FormatDialog from '@/features/formats/FormatDialog';
 
 const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   type: type as BrickType,
@@ -56,6 +57,7 @@ function App() {
   const [confirmNew, setConfirmNew] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+  const [formatsOpen, setFormatsOpen] = useState(false);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -183,6 +185,9 @@ function App() {
               <button type="button" className="popover-action" onClick={restoreProject} data-testid="button-restore-project">
                 <PackageOpen size={16} /> Letztes Projekt laden
               </button>
+              <button type="button" className="popover-action" onClick={() => { setFormatsOpen(true); setProjectMenu(false); }} data-testid="button-open-formats">
+                <PackageOpen size={16} /> Datei importieren / exportieren
+              </button>
               <div className="saved-projects" aria-label="Gespeicherte Projekte">
                 <p>Auf diesem Gerät</p>
                 {editor.projects.length ? editor.projects.map((project) => (
@@ -194,7 +199,7 @@ function App() {
                     data-testid={`button-open-project-${project.id}`}
                   >
                     <span>{project.name || 'Neues Modell'}</span>
-                    <small>{project.bricks.length} Steine</small>
+                    <small>{project.bricks.length + (project.imported?.instances.length ?? 0)} Steine</small>
                   </button>
                 )) : <span className="no-saved-projects">Noch keine Projekte gespeichert</span>}
               </div>
@@ -241,6 +246,7 @@ function App() {
             <Suspense fallback={<div className="canvas-loading">3D-Arbeitsfläche wird geladen …</div>}>
               <BuilderCanvas
                 bricks={editor.bricks}
+                imported={editor.imported}
                 selectedId={editor.selectedId}
                 selectedType={editor.selectedType}
                 selectedColor={editor.selectedColor}
@@ -250,6 +256,11 @@ function App() {
                 onMove={editor.move}
               />
             </Suspense>
+            {editor.imported && (
+              <button type="button" className="import-report-button" onClick={() => setFormatsOpen(true)} data-testid="button-import-report">
+                Import: {editor.imported.instances.length} Instanzen · {editor.imported.issues.length} Hinweise / Zuordnungen
+              </button>
+            )}
             {editor.brickCount === 0 && (
               <div className="canvas-hint" aria-hidden="true">
                 <span className="hint-cross">+</span>
@@ -474,6 +485,7 @@ function App() {
           </section>
         </div>
       )}
+      {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} />}
       <span className="sr-only" data-testid="status-save-message">{saveMessage}</span>
     </main>
   );

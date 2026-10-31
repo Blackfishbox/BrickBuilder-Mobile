@@ -142,7 +142,39 @@ Browsernavigation sowie die deutlich höhere Komplexität echter LDraw-Geometrie
 und IO-Dateien. Ein Desktop-Preview kann reale Android-Hardware nicht ersetzen;
 die Smartphone-Abnahme bleibt ein eigener Gerätetest.
 
-## Stand Phase 1
+## Implementierter Format-/Geometrieausbau
+
+Die oben als spätere Erweiterungen beschriebenen Adapter sind inzwischen in
+`features/formats/{internal,ldraw,mpd,io}` implementiert. Import und Export
+bleiben getrennt. Ein begrenzter ZIP32-Leser prüft den IO-Container; der
+LDraw-Parser erhält Untermodellquelle und affine Matrizen. Ein unabhängiger
+Resolver liest zuerst installierte Katalogdateien und bei Bedarf einen
+zusätzlichen geprüften Originalgeometrie-Snapshot, ohne die Paketkataloge
+oder die Studio-Quelldaten zu überschreiben.
+
+Abwärtskompatibler Ausbau des internen JSON v1: Das optionale `imported`-Objekt
+ergänzt die bestehenden `bricks`. Es enthält Originalbytes, Untermodellabschnitte,
+aufgelöste Instanzen mit 3×4-Matrizen in LDU, getrennte Kennungen, Hinweise,
+Geometrie-Ressourcen und Rechtstexte. Keine IndexedDB-Schemamigration ist dafür
+nötig. Historische v1-Projekte ohne dieses Feld bleiben unverändert gültig.
+Importierte Instanzen sind zunächst schreibgeschützt; sie durchlaufen nicht
+das bestehende Snap-/Y-Vierteldrehungsmodell der Baukastensteine.
+
+Die Engine gruppiert importierte Flächen nach Teil/Farbe als InstancedMeshes,
+trianguliert Originalflächen und rendert sie auch im Canvas-Fallback.
+Die Darstellung rechnet 20 LDU in eine Noppe um und invertiert die Y-Achse;
+Originalmatrizen werden nicht verändert. Kamera und Anzeigehöhe werden an
+das importierte Modell angepasst.
+
+Die Importvorschau schreibt nichts in die Datenbank. Die Bestätigung legt
+vorheriges Projekt, neues Projekt und aktiven Projektverweis in **einer**
+IndexedDB-Transaktion ab. Erst danach wird der Editor umgeschaltet.
+Projektdateien tragen ihre Ressourcen für das Offline-Wiederöffnen selbst.
+
+Tatsächlicher Kompatibilitätsstand, Tests und ausdrücklich nicht unterstützte
+Eigenschaften stehen im README und in der IO-Referenzanalyse.
+
+## Historischer Stand Phase 1
 
 Die Basisversion und die lokale LDraw-Paketbibliothek sind implementiert.
 Funktionen, Prüfergebnisse und bekannte Grenzen stehen in `README.md`.

@@ -18,6 +18,7 @@ import {
   loadProject,
   requestPersistentStorage,
   saveProject,
+  createImportedProject,
 } from "@/storage/database";
 
 export interface ModelAnalysis {
@@ -333,8 +334,22 @@ export function useBuilder() {
     await refreshProjects();
   }, [isReady, refreshProjects, replaceDocument]);
 
+  const importProject = useCallback(async (imported: BuilderDocument) => {
+    await createImportedProject(historyRef.current.document, imported);
+    replaceDocument(imported);
+    setSelectedId(null);
+    setToolMode("select");
+    setSavedAt(imported.updatedAt);
+    setSaveError(null);
+    // The import is committed even if refreshing the project list subsequently fails.
+    await refreshProjects().catch(() => undefined);
+  }, [refreshProjects, replaceDocument]);
+
   const document = history.document;
   return {
+    document,
+    imported: document.imported,
+    importProject,
     bricks: document.bricks,
     selectedId,
     selectedType,
@@ -363,7 +378,7 @@ export function useBuilder() {
     openProject,
     projectName: document.name,
     setProjectName: updateProjectName,
-    brickCount: document.bricks.length,
+    brickCount: document.bricks.length + (document.imported?.instances.length ?? 0),
     startNewProject,
     restoreLastProject,
   };
