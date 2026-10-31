@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ldraw-bricks",
+    "version": "2026-10-31",
+    "title": "LDraw · Steine",
+    "description": "Sechs klassische Steine mit Original-LDraw-Dateien.",
+    "url": "parts/ldraw-bricks-2026-10-31.json",
+    "sha256": "4f268cd204ea1a33078bdb694affad0f6dd2195f896e8c2a518d47c9726b8677",
+    "bytes": 53571,
+    "partCount": 6,
+    "fileCount": 23,
+    "sourceUrl": "https://library.ldraw.org/library/official/",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "licenses": [
+      "CC-BY-4.0"
+    ],
+    "attribution": "James Jessiman; Niels Karsdorp [nielsk]; Steffen [Steffen]; Owen Burgoyne [C3POwen]; Tore Eriksson [Tore_Eriksson]; Willy Tschager [Holly-Wood]",
+    "changes": "Originaldateien unverändert; Auswahl, Paketierung und Suchmetadaten durch BrickBuilder."
+  },
+  {
+    "id": "ldraw-plates",
+    "version": "2026-10-31",
+    "title": "LDraw · Platten",
+    "description": "Sechs flache Platten mit Original-LDraw-Dateien.",
+    "url": "parts/ldraw-plates-2026-10-31.json",
+    "sha256": "f9a71172089a782fbf71116a418f43126d41ccebe07c1e92b98415cb58b69df8",
+    "bytes": 49439,
+    "partCount": 6,
+    "fileCount": 22,
+    "sourceUrl": "https://library.ldraw.org/library/official/",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "licenses": [
+      "CC-BY-4.0"
+    ],
+    "attribution": "James Jessiman; Orion Pobursky [OrionP]; Massimo Maso [Sirio]; Tore Eriksson [Tore_Eriksson]; Steffen [Steffen]",
+    "changes": "Originaldateien unverändert; Auswahl, Paketierung und Suchmetadaten durch BrickBuilder."
+  }
+]

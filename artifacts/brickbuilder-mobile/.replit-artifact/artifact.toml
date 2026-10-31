@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "BrickBuilder Mobile"
+description = "Eine offlinefähige, installierbare mobile 3D-Konstruktions-App für LEGO-kompatible Bausteinmodelle mit lokaler Projektspeicherung und touchoptimierter Bedienung."
+version = "1.0.0"
+id = "artifacts/brickbuilder-mobile"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23048
+
+[services.development]
+run = "pnpm --filter @workspace/brickbuilder-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/brickbuilder-mobile", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/brickbuilder-mobile/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23048"
+BASE_PATH = "/"
