@@ -14,7 +14,8 @@ import {
 } from "./model";
 import { commit, createHistory, redo, undo, type HistoryState } from "./history";
 import {
-  listProjects,
+  listProjectSummaries,
+  type ProjectSummary,
   loadCurrentProject,
   loadProject,
   requestPersistentStorage,
@@ -49,9 +50,10 @@ export function useBuilder() {
     bounds: null,
     overlapCount: 0,
   });
-  const [projects, setProjects] = useState<BuilderDocument[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const historyRef = useRef(history);
   const documentRef = useRef(history.document);
+  const lastSavedDocumentRef = useRef<BuilderDocument | null>(null);
   const analysisIdRef = useRef(0);
   const analysisWorkerRef = useRef<Worker | null>(null);
 
@@ -60,16 +62,17 @@ export function useBuilder() {
     documentRef.current = history.document;
   }, [history]);
 
-  const replaceDocument = useCallback((document: BuilderDocument) => {
+  const replaceDocument = useCallback((document: BuilderDocument, alreadySaved = false) => {
     const opened = normalizeDocument(document);
     const next = createHistory(opened);
     historyRef.current = next;
     documentRef.current = opened;
+    lastSavedDocumentRef.current = alreadySaved ? opened : null;
     setHistory(next);
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    const savedProjects = await listProjects();
+    const savedProjects = await listProjectSummaries();
     setProjects(savedProjects);
     return savedProjects;
   }, []);
@@ -79,7 +82,7 @@ export function useBuilder() {
     try {
       const stored = await loadCurrentProject();
       if (stored) {
-        replaceDocument(stored);
+        replaceDocument(stored, true);
         setSavedAt(stored.updatedAt);
         restored = true;
       } else {
@@ -107,7 +110,9 @@ export function useBuilder() {
     if (!isReady) return;
     setIsSaving(true);
     try {
-      await saveProject(documentRef.current);
+      const snapshot = documentRef.current;
+      await saveProject(snapshot);
+      lastSavedDocumentRef.current = snapshot;
       setSavedAt(new Date().toISOString());
       setSaveError(null);
       await refreshProjects().catch(() => undefined);
@@ -122,7 +127,7 @@ export function useBuilder() {
   }, [isReady, refreshProjects]);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || history.document === lastSavedDocumentRef.current) return;
     const timeout = window.setTimeout(
       () => void persist().catch(() => undefined),
       450,
@@ -315,7 +320,7 @@ export function useBuilder() {
       const project = await loadProject(id);
       if (!project) return false;
       await saveProject(project);
-      replaceDocument(project);
+      replaceDocument(project, true);
       setSavedAt(project.updatedAt);
       setSelectedId(null);
       setToolMode("build");
@@ -338,7 +343,7 @@ export function useBuilder() {
 
   const importProject = useCallback(async (imported: BuilderDocument) => {
     await createImportedProject(historyRef.current.document, imported);
-    replaceDocument(imported);
+    replaceDocument(imported, true);
     setSelectedId(null);
     setToolMode("select");
     setSavedAt(imported.updatedAt);

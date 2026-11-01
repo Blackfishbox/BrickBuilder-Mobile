@@ -9,6 +9,21 @@ interface AppMetadata {
   value: string;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  updatedAt: string;
+  brickCount: number;
+}
+const SUMMARY_PREFIX = "project-summary:";
+function summaryMetadata(document: BuilderDocument): AppMetadata {
+  const summary: ProjectSummary = {
+    id: document.id, name: document.name, updatedAt: document.updatedAt,
+    brickCount: document.bricks.length + (document.imported?.instances.length ?? 0),
+  };
+  return { key: SUMMARY_PREFIX + document.id, value: JSON.stringify(summary) };
+}
+
 class BuilderDatabase extends Dexie {
   projects!: Table<BuilderDocument, string>;
   metadata!: Table<AppMetadata, string>;
@@ -40,6 +55,7 @@ export async function saveProject(document: BuilderDocument): Promise<void> {
   const savedDocument = { ...document, updatedAt: new Date().toISOString() };
   await builderDatabase.transaction("rw", builderDatabase.projects, builderDatabase.metadata, async () => {
     await builderDatabase.projects.put(savedDocument);
+    await builderDatabase.metadata.put(summaryMetadata(savedDocument));
     await builderDatabase.metadata.put({
       key: "activeProjectId",
       value: savedDocument.id,
@@ -54,6 +70,7 @@ export async function createImportedProject(previous: BuilderDocument, imported:
     if (await builderDatabase.projects.get(imported.id)) throw new Error("Projekt-ID bereits vorhanden.");
     await builderDatabase.projects.put(previous);
     await builderDatabase.projects.add(imported);
+    await builderDatabase.metadata.bulkPut([summaryMetadata(previous), summaryMetadata(imported)]);
     await builderDatabase.metadata.put({ key: "activeProjectId", value: imported.id });
   });
 }
@@ -73,6 +90,35 @@ export async function loadProject(id: string): Promise<BuilderDocument | null> {
 
 export async function listProjects(): Promise<BuilderDocument[]> {
   return builderDatabase.projects.orderBy("updatedAt").reverse().toArray();
+}
+
+/** Lists never retain a second full copy of every imported model and archive. */
+export async function listProjectSummaries(): Promise<ProjectSummary[]> {
+  const ids = await builderDatabase.projects.toCollection().primaryKeys();
+  const cached = await builderDatabase.metadata.bulkGet(ids.map(id => SUMMARY_PREFIX + id));
+  const result: ProjectSummary[] = [];
+  for (let index = 0; index < ids.length; index++) {
+    let summary: ProjectSummary | undefined;
+    if (cached[index]) {
+      try {
+        const parsed = JSON.parse(cached[index]!.value) as ProjectSummary;
+        if (parsed.id === ids[index] && typeof parsed.name === "string" &&
+            typeof parsed.updatedAt === "string" && Number.isFinite(parsed.brickCount)) summary = parsed;
+      } catch { /* Rebuild missing or malformed derived metadata from its project. */ }
+    }
+    if (!summary) {
+      // Legacy projects are visited one at a time, never loaded into one array.
+      summary = await builderDatabase.transaction("rw", builderDatabase.projects, builderDatabase.metadata, async () => {
+        const document = await builderDatabase.projects.get(ids[index]);
+        if (!document) return undefined;
+        const metadata = summaryMetadata(document);
+        await builderDatabase.metadata.put(metadata);
+        return JSON.parse(metadata.value) as ProjectSummary;
+      });
+    }
+    if (summary) result.push(summary);
+  }
+  return result.sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
 }
 
 export async function requestPersistentStorage(): Promise<boolean> {

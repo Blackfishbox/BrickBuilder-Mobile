@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { DirectionalLight, HemisphereLight, InstancedMesh, MeshLambertMaterial, SRGBColorSpace } from "three";
+import { Color, DirectionalLight, HemisphereLight, InstancedMesh, MeshLambertMaterial, SRGBColorSpace } from "three";
 import { COLORS, resolveColor } from "./colors";
 import { LDRAW_COLOR_SNAPSHOT } from "./ldraw-palette";
 import { refreshModelColors } from "./model-colors";
@@ -68,9 +68,17 @@ describe("offline LDraw import colors", () => {
     refreshModelColors(model);
     expect(model.instances[0].colorCode).toBe("14");
     const group = createImportedGroup(model);
-    const materials = group.children.filter(child => child instanceof InstancedMesh)
-      .map(mesh => mesh.material as MeshLambertMaterial);
-    expect(materials.map(material => material.color.getHexString(SRGBColorSpace)).sort())
+    const meshes = group.children.filter(child => child instanceof InstancedMesh);
+    const materials = meshes.map(mesh => mesh.material as MeshLambertMaterial);
+    // Inherited colors use per-instance colors; fixed printed surfaces use
+    // vertex colors so many source colors can share one material/draw.
+    const appearance = meshes.map(mesh => {
+      const color = new Color();
+      if (mesh.instanceColor) mesh.getColorAt(0, color);
+      else color.fromBufferAttribute(mesh.geometry.getAttribute("color"), 0);
+      return color.getHexString(SRGBColorSpace);
+    });
+    expect(appearance.sort())
       .toEqual(["aee9ef", "b40000", "fac80a"]);
     const transparent = materials.find(material => material.transparent)!;
     expect(transparent.opacity).toBeCloseTo(128 / 255);

@@ -187,6 +187,34 @@ There is no account-based sync or server recovery. Clearing a service-worker
 cache and deleting IndexedDB are different actions; avoid deleting user data
 when troubleshooting stale app assets.
 
+### User-controlled space management
+
+Open the project menu → **Offline-Speicher verwalten** to inspect browser-reported
+usage/quota and separate lists of saved projects, installed packages and reusable
+import-geometry snapshots. Category sizes estimate UTF-8 JSON payloads, not actual
+IndexedDB disk allocation or compressed download sizes. The browser's origin-wide
+estimate can include app caches and other data, may be rounded, and may be unavailable.
+It is not expected to equal the sum of category estimates.
+
+Removing a reusable snapshot removes only its shared copy. Existing saved projects
+retain their embedded geometry, original upload bytes, attribution and legal texts.
+Future imports may need to retrieve those files again. Installed packages are never
+automatically evicted to make room; removing one requires explicit confirmation.
+It disappears from the parts library until the user reinstalls it.
+
+Project deletion also requires confirmation and removes that project's local
+original uploads and resources permanently. Export and verify a full JSON backup
+first; downloading a backup does not itself delete anything. The currently opened
+project is protected: switch to a different project before deleting it. Deleting
+one project does not prune resources from other projects or remove shared packages
+or reusable snapshots.
+
+Full JSON backups are not subject to the 32 MiB source-upload transport limit:
+embedded original byte arrays, decoded sections and resources can make a supported
+source upload expand beyond that size. The file picker and importer share this
+rule; decoded JSON model/resource validation limits remain in effect. Large
+backups still require enough browser memory to parse and validate.
+
 ## Optional LDraw resolver
 
 The existing Express service exposes `GET /api/ldraw/file?path=parts%2F3004.dat`

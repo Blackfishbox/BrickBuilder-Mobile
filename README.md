@@ -50,6 +50,7 @@ optional API services and troubleshooting.
 
 - `artifacts/brickbuilder-mobile/` — React, TypeScript, Vite, Three.js, Dexie and PWA.
 - `artifacts/brickbuilder-mobile/docs/` — architecture, import evidence and licensing.
+- [Large-model performance](artifacts/brickbuilder-mobile/docs/performance.md) — rendering budgets, reference measurements and device-testing limits.
 - `artifacts/api-server/` — optional same-origin LDraw resolver; no database or API key required.
 - `lib/` — workspace libraries, API contracts and optional database support.
 - `scripts/` — maintenance and sanitized GitHub backup utilities.

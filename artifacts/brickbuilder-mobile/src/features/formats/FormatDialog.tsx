@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, Download, FileUp, LoaderCircle, X } from 'lucide-react';
 import type { BuilderDocument } from '@/features/editor/model';
 import type { ImportedModel } from './types';
-import { exportModel, importModelFile } from './adapters';
+import { exportModel, importModelFile, validateImportFile } from './adapters';
 import ImportPartNotification from './ImportPartNotification';
 import { resolveGeometry } from './geometry-resolver';
 import type { GeometryProgress } from './online-geometry';
@@ -11,7 +11,6 @@ import './format-dialog.css';
 type ExportFormat = 'json' | 'ldr' | 'mpd' | 'io';
 type WithImported = BuilderDocument & { imported?: ImportedModel };
 
-const MAX_BYTES = 32 * 1024 * 1024;
 const EXPORTS: { format: ExportFormat; label: string; note: string }[] = [
   { format: 'json', label: 'Projekt (JSON)', note: 'Vollständige Sicherung dieses Projekts' },
   { format: 'ldr', label: 'LDraw (.ldr)', note: 'Einzelmodell für LDraw-Programme' },
@@ -134,8 +133,8 @@ export default function FormatDialog({ document, onClose, onImport, onResolved }
     setPreview(null); setError(''); setBusy(false);
     if (!file) return;
     setFileName(file.name);
-    if (!/\.(io|ldr|mpd|json)$/i.test(file.name)) { setError('Nicht unterstütztes Format. Erlaubt: IO, LDR, MPD, JSON.'); return; }
-    if (file.size > MAX_BYTES) { setError('Datei ist größer als 32 MiB.'); return; }
+    try { validateImportFile(file); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Datei konnte nicht gelesen werden.'); return; }
     setBusy(true);
     try {
       const doc = await importModelFile(file, { signal: operation.signal,
@@ -201,7 +200,7 @@ export default function FormatDialog({ document, onClose, onImport, onResolved }
           <h3><span>01</span> Importieren</h3>
           <label className="fmt-drop">
             <FileUp size={20} />
-            <span><b>{fileName || 'Datei auswählen'}</b><small>IO, LDR, MPD oder JSON · max. 32 MiB</small></span>
+            <span><b>{fileName || 'Datei auswählen'}</b><small>IO, LDR, MPD bis 32 MiB · JSON-Projektsicherungen auch größer</small></span>
             <input type="file" accept=".io,.ldr,.mpd,.json" disabled={creating} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ''; }} data-testid="input-import-file" />
           </label>
           {busy && <div className="fmt-loading" role="status" style={{ flexWrap: 'wrap' }}>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BoxGeometry,
   Box3,
@@ -26,9 +26,11 @@ import {
   WebGLRenderer,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { compilePart, createImportedGroup, worldMatrix } from "./ldraw-geometry";
+import { createImportedGroupAsync, disposeImportedScene, SceneBudgetExceeded } from "./imported-scene";
+import { prepareGeometry } from "./prepare-geometry";
+import { invalidateGeometry } from "./ldraw-geometry";
+import { createSoftwareScene, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { createBuilderLighting } from "./lighting";
-import { resolveColor } from "../formats/colors";
 import type { ImportedModel } from "../formats/types";
 
 import {
@@ -91,7 +93,7 @@ interface ProjectedPoint {
 class FallbackRenderer {
   readonly domElement = document.createElement("canvas");
   private readonly context = this.domElement.getContext("2d");
-  private pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  private pixelRatio = Math.min(window.devicePixelRatio || 1, 1.25);
   private width = 1;
   private height = 1;
 
@@ -113,8 +115,9 @@ class FallbackRenderer {
     target: Vector3,
     bricks: Brick[],
     selectedId: string | null,
-    imported?: ImportedModel,
+    imported?: SoftwareScene,
     importOffset = 0,
+    interactive = false,
   ): void {
     const context = this.context;
     if (!context) return;
@@ -173,32 +176,18 @@ class FallbackRenderer {
     }
     context.restore();
 
-    // Exact LDraw triangles in the software renderer, not replacement boxes.
+    // Bounded, pretransformed source triangles; never traverse the full model
+    // or allocate millions of world-space vectors for a camera movement.
     if (imported) {
       const faces: { points: ProjectedPoint[]; depth: number; color: string; alpha: number }[] = [];
-      const vertex = new Vector3();
-      const light = new Vector3(-0.4, 0.8, 0.5).normalize();
-      for (const instance of imported.instances) {
-        if (instance.part.status !== "resolved") continue;
-        const matrix = worldMatrix(instance.matrix);
-        matrix.elements[13] += importOffset;
-        for (const surface of compilePart(imported, instance.reference, instance.colorCode)) {
-          const mapping = resolveColor(surface.colorCode);
-          const color = new Color(mapping?.hex ?? "#ff00ff");
-          for (let index = 0; index < surface.positions.length; index += 9) {
-            const world = [];
-            for (let v = 0; v < 9; v += 3) {
-              world.push(vertex.fromArray(surface.positions, index + v).applyMatrix4(matrix).clone());
-            }
-            const points = world.map(p => project(p.x, p.y, p.z));
+      const stride = interactive ? Math.max(1, Math.ceil(imported.triangleCount / INTERACTIVE_TRIANGLE_BUDGET)) : 1;
+      for (let triangle = 0; triangle < imported.triangleCount; triangle += stride) {
+            const index = triangle * 9, vertices = imported.positions;
+            const points = [0, 3, 6].map(offset => project(vertices[index + offset], vertices[index + offset + 1] + importOffset, vertices[index + offset + 2]));
             if (points.some(p => p.depth < 0.1)) continue;
             const area = (points[1].x - points[0].x) * (points[2].y - points[0].y) - (points[1].y - points[0].y) * (points[2].x - points[0].x);
             if (Math.abs(area) < 0.08) continue;
-            const normal = world[1].clone().sub(world[0]).cross(world[2].clone().sub(world[0])).normalize();
-            const shade = 0.6 + 0.4 * Math.abs(normal.dot(light));
-            faces.push({ points, depth: points.reduce((s, p) => s + p.depth, 0) / 3, color: color.clone().multiplyScalar(shade).getStyle(), alpha: (mapping?.alpha ?? 255) / 255 });
-          }
-        }
+            faces.push({ points, depth: points.reduce((s, p) => s + p.depth, 0) / 3, color: imported.colors[triangle], alpha: imported.alpha[triangle] });
       }
       faces.sort((a, b) => b.depth - a.depth);
       for (const face of faces) {
@@ -215,7 +204,11 @@ class FallbackRenderer {
         camera.position.distanceTo(new Vector3(second.x, second.y, second.z)) -
         camera.position.distanceTo(new Vector3(first.x, first.y, first.z)),
     );
+    let visibleBricks = 0;
     for (const brick of orderedBricks) {
+      const center = project(brick.x, brick.y, brick.z);
+      if (center.depth < 0.1 || center.x < -96 || center.x > this.width + 96 || center.y < -96 || center.y > this.height + 96) continue;
+      if (visibleBricks++ >= (interactive ? 300 : 1200) && brick.id !== selectedId) continue;
       const definition = BRICK_DEFINITIONS[brick.type];
       const theta = (brick.rotation * Math.PI) / 180;
       const corners = [
@@ -375,10 +368,9 @@ function makeCameraPosition(
 
 function fitImportedView(
   camera: PerspectiveCamera,
-  root: Group,
+  bounds: Box3,
   state: { target: Vector3; distance: number; theta: number; phi: number },
 ): void {
-  const bounds = new Box3().setFromObject(root);
   if (bounds.isEmpty()) return;
   bounds.getCenter(state.target);
   // Fit the bounding sphere against the narrower field of view, including portrait.
@@ -386,6 +378,8 @@ function fitImportedView(
   const halfHorizontal = Math.atan(Math.tan(halfVertical) * camera.aspect);
   const radius = bounds.getSize(new Vector3()).length() / 2;
   state.distance = Math.max(8, radius / Math.sin(Math.min(halfVertical, halfHorizontal)) * 1.08);
+  camera.far = Math.max(2000, (state.distance + radius) * 8);
+  camera.updateProjectionMatrix();
   makeCameraPosition(camera, state.target, state.theta, state.phi, state.distance);
 }
 
@@ -426,7 +420,15 @@ export function BuilderCanvas({
   const rendererRef = useRef<WebGLRenderer | FallbackRenderer | null>(null);
   const brickRootRef = useRef<Group | null>(null);
   const importedRootRef = useRef<Group | null>(null);
+  const importedBoundsRef = useRef<Box3 | null>(null);
+  const softwareSceneRef = useRef<SoftwareScene | undefined>(undefined);
   const importedOffsetRef = useRef(0);
+  const interactionTimeRef = useRef(-Infinity);
+  const buildControllerRef = useRef<AbortController | null>(null);
+  const [sceneStatus, setSceneStatus] = useState<string | null>(null);
+  const [renderWarning, setRenderWarning] = useState<string | null>(null);
+  const [buildAttempt, setBuildAttempt] = useState(0);
+  const [forceCompatibility, setForceCompatibility] = useState(false);
   const invalidatorRef = useRef<(() => void) | null>(null);
   const raycasterRef = useRef(new Raycaster());
   const propsRef = useRef({
@@ -484,11 +486,11 @@ export function BuilderCanvas({
       renderer = new WebGLRenderer({
         canvas: renderCanvas,
         context: webglContext,
-        antialias: true,
+        antialias: false,
         alpha: false,
         powerPreference: "high-performance",
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
       renderer.outputColorSpace = SRGBColorSpace;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = PCFSoftShadowMap;
@@ -502,6 +504,12 @@ export function BuilderCanvas({
     renderer.domElement.style.touchAction = "none";
     renderer.domElement.style.userSelect = "none";
     host.appendChild(renderer.domElement);
+    const contextLost = (event: Event) => {
+      if (rendererRef.current !== renderer) return;
+      event.preventDefault();
+      setForceCompatibility(true);
+    };
+    renderer.domElement.addEventListener("webglcontextlost", contextLost);
 
     scene.add(createBuilderLighting());
 
@@ -533,21 +541,36 @@ export function BuilderCanvas({
     );
 
     let animationFrame: number | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastPixelRatio = Math.min(window.devicePixelRatio || 1, 1.25);
     const invalidate = () => {
       if (animationFrame !== null) return;
       animationFrame = window.requestAnimationFrame(() => {
         animationFrame = null;
-        if (renderer instanceof WebGLRenderer) {
-          renderer.render(scene, camera);
+        const interactive = performance.now() - interactionTimeRef.current < 180;
+        const activeRenderer = rendererRef.current ?? renderer;
+        if (activeRenderer instanceof WebGLRenderer) {
+          const ratio = interactive ? 0.85 : Math.min(window.devicePixelRatio || 1, 1.25);
+          if (ratio !== lastPixelRatio) { activeRenderer.setPixelRatio(ratio); lastPixelRatio = ratio; }
+          importedRootRef.current?.children.forEach(child => {
+            if (child.name === "ldraw:instanced-edges") child.visible = !interactive;
+          });
+          try { activeRenderer.render(scene, camera); }
+          catch { setForceCompatibility(true); }
         } else {
-          renderer.render(
+          activeRenderer.render(
             camera,
             cameraStateRef.current.target,
             propsRef.current.bricks,
             propsRef.current.selectedId,
-            propsRef.current.imported,
+            softwareSceneRef.current,
             importedOffsetRef.current,
+            interactive,
           );
+        }
+        if (interactive) {
+          clearTimeout(settleTimer);
+          settleTimer = setTimeout(invalidate, 190);
         }
       });
     };
@@ -556,10 +579,10 @@ export function BuilderCanvas({
     const resizeObserver = new ResizeObserver(() => {
       const { width, height } = host.getBoundingClientRect();
       if (width <= 0 || height <= 0) return;
-      setRendererSize(renderer, width, height);
+      setRendererSize(rendererRef.current ?? renderer, width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (importedRootRef.current) fitImportedView(camera, importedRootRef.current, cameraStateRef.current);
+      if (importedBoundsRef.current) fitImportedView(camera, importedBoundsRef.current, cameraStateRef.current);
       invalidate();
     });
     resizeObserver.observe(host);
@@ -568,8 +591,16 @@ export function BuilderCanvas({
     return () => {
       resizeObserver.disconnect();
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+      clearTimeout(settleTimer);
       invalidatorRef.current = null;
+      renderer.domElement.removeEventListener("webglcontextlost", contextLost);
+      if (importedRootRef.current) {
+        scene.remove(importedRootRef.current);
+        disposeImported(importedRootRef.current);
+        importedRootRef.current = null;
+      }
       scene.traverse((object) => {
+        if (object instanceof InstancedMesh) object.dispose();
         if (object instanceof Mesh) {
           disposeMaterial(object.material);
           if (!geometryCacheHas(object.geometry)) object.geometry.dispose();
@@ -580,6 +611,7 @@ export function BuilderCanvas({
       });
       if (renderer instanceof WebGLRenderer) renderer.dispose();
       renderer.domElement.remove();
+      if (rendererRef.current && rendererRef.current !== renderer) rendererRef.current.domElement.remove();
       sceneRef.current = null;
       cameraRef.current = null;
       rendererRef.current = null;
@@ -594,34 +626,94 @@ export function BuilderCanvas({
     const previous = importedRootRef.current;
     if (previous) { scene.remove(previous); disposeImported(previous); }
     importedRootRef.current = null;
+    importedBoundsRef.current = null;
+    softwareSceneRef.current = undefined;
     importedOffsetRef.current = 0;
-    if (imported) {
-      const root = createImportedGroup(imported);
-      const bounds = new Box3().setFromObject(root);
+    const controller = new AbortController();
+    buildControllerRef.current = controller;
+    setRenderWarning(null);
+    setSceneStatus(imported ? "3D-Modell wird vorbereitet …" : null);
+    const build = async () => {
+      if (!imported) return;
+      let lastProgress = 0;
+      const progress = (stage: string) => (completed: number, total: number) => {
+        if (controller.signal.aborted || performance.now() - lastProgress < 80) return;
+        lastProgress = performance.now();
+        setSceneStatus(`${stage}: ${completed} / ${total}`);
+      };
+      await prepareGeometry(imported, { signal: controller.signal, onProgress: progress("Geometrie") });
+      let root: Group | null = null, bounds: Box3;
+      if (rendererRef.current instanceof WebGLRenderer && !forceCompatibility) {
+        try {
+          const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+          const maxGeometryBytes = (memory <= 1 ? 32 : memory <= 2 ? 64 : 96) * 1024 * 1024;
+          root = await createImportedGroupAsync(imported, {
+            signal: controller.signal, onProgress: progress("3D-Szene"), maxGeometryBytes,
+          });
+        } catch (error) {
+          if (!(error instanceof SceneBudgetExceeded)) throw error;
+          // Budget is checked before GPU upload; switch instead of risking a
+          // driver/context crash or throwing away the user's model.
+        }
+      }
+      if (root) bounds = new Box3().setFromObject(root);
+      else {
+        if (rendererRef.current instanceof WebGLRenderer) {
+          const previousRenderer = rendererRef.current;
+          previousRenderer.dispose();
+          previousRenderer.domElement.remove();
+          const fallback = new FallbackRenderer();
+          fallback.domElement.className = "builder-webgl-canvas";
+          fallback.domElement.setAttribute("data-renderer", "canvas-fallback");
+          fallback.domElement.setAttribute("aria-label", "3D-Kompatibilitätsansicht");
+          fallback.domElement.style.touchAction = "none";
+          const rectangle = hostRef.current!.getBoundingClientRect();
+          fallback.setSize(rectangle.width, rectangle.height);
+          hostRef.current!.appendChild(fallback.domElement);
+          rendererRef.current = fallback;
+        }
+        const software = await createSoftwareScene(imported, { signal: controller.signal, onProgress: progress("Kompatibilitätsansicht") });
+        controller.signal.throwIfAborted();
+        softwareSceneRef.current = software;
+        invalidateGeometry(imported);
+        bounds = software.bounds.clone();
+        setRenderWarning(`Kompatibilitätsansicht ohne WebGL: ${software.triangleCount.toLocaleString("de-DE")} von ${software.sourceTriangles.toLocaleString("de-DE")} Dreiecken. Während der Bewegung sind Details reduziert; alle Projektdaten bleiben erhalten.`);
+      }
+      invalidateGeometry(imported);
+      if (controller.signal.aborted) { if (root) disposeImported(root); return; }
       if (!bounds.isEmpty()) {
         const offset = Math.max(0, -bounds.min.y);
-        root.position.y = offset;
+        if (root) root.position.y = offset;
         importedOffsetRef.current = offset;
         bounds.translate(new Vector3(0, offset, 0));
+        importedBoundsRef.current = bounds;
         const rectangle = hostRef.current?.getBoundingClientRect();
         if (rectangle && rectangle.height > 0) {
           camera.aspect = rectangle.width / rectangle.height;
           camera.updateProjectionMatrix();
         }
-        fitImportedView(camera, root, cameraStateRef.current);
+        fitImportedView(camera, bounds, cameraStateRef.current);
       }
-      scene.add(root);
-      importedRootRef.current = root;
-    }
+      if (root) { scene.add(root); importedRootRef.current = root; }
+      setSceneStatus(null);
+      invalidatorRef.current?.();
+    };
+    void build().catch(error => {
+      if (controller.signal.aborted) return;
+      setSceneStatus(null);
+      setRenderWarning(`3D-Aufbau fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}. Projektdaten bleiben erhalten.`);
+    });
     invalidatorRef.current?.();
     return () => {
+      controller.abort();
+      softwareSceneRef.current = undefined;
       if (importedRootRef.current) {
         scene.remove(importedRootRef.current);
         disposeImported(importedRootRef.current);
         importedRootRef.current = null;
       }
     };
-  }, [imported]);
+  }, [imported, buildAttempt, forceCompatibility]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -629,6 +721,7 @@ export function BuilderCanvas({
     if (!scene || !previousRoot) return;
     scene.remove(previousRoot);
     previousRoot.traverse((object) => {
+      if (object instanceof InstancedMesh) object.dispose();
       if (object instanceof Mesh) {
         disposeMaterial(object.material);
         if (!geometryCacheHas(object.geometry)) object.geometry.dispose();
@@ -704,12 +797,14 @@ export function BuilderCanvas({
       target = cameraStateRef.current.target,
     ) => {
       const cameraState = cameraStateRef.current;
-      cameraState.theta = theta;
-      cameraState.phi = Math.max(0.25, Math.min(1.42, phi));
-      cameraState.distance = Math.max(3, Math.min(1500, distance));
-      cameraState.target.copy(target);
       const camera = cameraRef.current;
       if (!camera) return;
+      cameraState.theta = theta;
+      cameraState.phi = Math.max(0.25, Math.min(1.42, phi));
+      const maxDistance = Math.max(1500, camera.far / 2);
+      cameraState.distance = Math.max(3, Math.min(maxDistance, distance));
+      cameraState.target.copy(target);
+      interactionTimeRef.current = performance.now();
       makeCameraPosition(
         camera,
         cameraState.target,
@@ -783,6 +878,7 @@ export function BuilderCanvas({
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("button")) return;
       event.preventDefault();
       host.setPointerCapture(event.pointerId);
       const point = { x: event.clientX, y: event.clientY };
@@ -894,6 +990,7 @@ export function BuilderCanvas({
     };
 
     const onPointerUp = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest("button")) return;
       const point = { x: event.clientX, y: event.clientY };
       const current = propsRef.current;
       const click = clickRef.current;
@@ -948,7 +1045,29 @@ export function BuilderCanvas({
     };
   }, []);
 
-  return <div ref={hostRef} className="builder-canvas" data-testid="canvas-3d" />;
+  const compatibilityHint = rendererRef.current instanceof FallbackRenderer && bricks.length > 1200
+    ? "Kompatibilitätsansicht ohne WebGL: begrenzte Details bei großen Projekten; alle Steine bleiben gespeichert."
+    : null;
+  return <div ref={hostRef} className="builder-canvas" data-testid="canvas-3d" style={{ position: "relative" }}>
+    {(sceneStatus || renderWarning || compatibilityHint) && <div
+      role="status"
+      className="absolute left-2 right-2 top-2 z-10 rounded-lg bg-white/95 p-3 text-xs text-stone-700 shadow"
+      style={{ pointerEvents: "none" }}
+    >
+      <p>{sceneStatus ?? renderWarning ?? compatibilityHint}</p>
+      {sceneStatus ? <button type="button" className="mt-2 underline"
+        style={{ pointerEvents: "auto" }}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={() => {
+          buildControllerRef.current?.abort();
+          setSceneStatus(null);
+          setRenderWarning("3D-Aufbau abgebrochen. Das Projekt bleibt unverändert gespeichert.");
+        }}>Vorbereitung abbrechen</button> : <button type="button" className="mt-2 underline"
+          style={{ pointerEvents: "auto" }}
+          onPointerDown={event => event.stopPropagation()}
+          onClick={() => setBuildAttempt(value => value + 1)}>Darstellung neu aufbauen</button>}
+    </div>}
+  </div>;
 }
 
 function geometryCacheHas(geometry: InstancedMesh["geometry"]): boolean {
@@ -956,16 +1075,7 @@ function geometryCacheHas(geometry: InstancedMesh["geometry"]): boolean {
 }
 
 function disposeImported(root: Group): void {
-  const geometries = new Set<BufferGeometry>();
-  const materials = new Set<Material>();
-  root.traverse(object => {
-    if (object instanceof Mesh || object instanceof LineSegments) {
-      geometries.add(object.geometry);
-      for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
-    }
-  });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
+  disposeImportedScene(root);
 }
 
 function setRendererSize(

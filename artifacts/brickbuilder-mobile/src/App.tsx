@@ -14,6 +14,7 @@ import {
   CloudOff,
   Command,
   FilePlus2,
+  HardDrive,
   Grid2X2,
   Hammer,
   Layers3,
@@ -36,6 +37,7 @@ import '@/components/mobile/editor.css';
 import PartsLibrary from '@/features/parts/PartsLibrary';
 import FormatDialog from '@/features/formats/FormatDialog';
 import ImportPartNotification from '@/features/formats/ImportPartNotification';
+import StorageManager from '@/features/storage/StorageManager';
 
 const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   type: type as BrickType,
@@ -59,6 +61,7 @@ function App() {
   const [restoreMessage, setRestoreMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [formatsOpen, setFormatsOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -189,6 +192,9 @@ function App() {
               <button type="button" className="popover-action" onClick={() => { setFormatsOpen(true); setProjectMenu(false); }} data-testid="button-open-formats">
                 <PackageOpen size={16} /> Datei importieren / exportieren
               </button>
+              <button type="button" className="popover-action" onClick={() => { setStorageOpen(true); setProjectMenu(false); }} data-testid="button-open-storage">
+                <HardDrive size={16} /> Offline-Speicher verwalten
+              </button>
               <div className="saved-projects" aria-label="Gespeicherte Projekte">
                 <p>Auf diesem Gerät</p>
                 {editor.projects.length ? editor.projects.map((project) => (
@@ -200,7 +206,7 @@ function App() {
                     data-testid={`button-open-project-${project.id}`}
                   >
                     <span>{project.name || 'Neues Modell'}</span>
-                    <small>{project.bricks.length + (project.imported?.instances.length ?? 0)} Steine</small>
+                    <small>{project.brickCount} Steine</small>
                   </button>
                 )) : <span className="no-saved-projects">Noch keine Projekte gespeichert</span>}
               </div>
@@ -487,6 +493,7 @@ function App() {
         </div>
       )}
       {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} onResolved={editor.resolveImportedProject} />}
+      {storageOpen && <StorageManager currentProjectId={editor.document.id} onClose={() => setStorageOpen(false)} onProjectsChanged={editor.refreshProjects} />}
       {!formatsOpen && (
         <ImportPartNotification key={editor.document.id} model={editor.imported} floating />
       )}

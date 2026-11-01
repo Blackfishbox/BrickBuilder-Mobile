@@ -8,10 +8,18 @@ import { importIO } from "./io/import";
 import { exportIO } from "./io/export";
 import type { ResolveOptions } from "./online-geometry";
 
-export async function importModelFile(file: File, options: ResolveOptions = {}): Promise<BuilderDocument> {
-  if (file.size > 32 * 1024 * 1024) throw new Error("Die Datei überschreitet 32 MiB.");
+export function validateImportFile(file: Pick<File, "name" | "size">): void {
   const format = file.name.split(".").pop()?.toLowerCase();
   if (!["json", "ldr", "mpd", "io"].includes(format ?? "")) throw new Error("Unterstützte Dateien: JSON, LDR, MPD, IO.");
+  // A full JSON backup expands upload bytes into number arrays and includes
+  // project-owned resources. The source-file transport limit cannot apply to it;
+  // importInternal still enforces the decoded model and resource limits.
+  if (format !== "json" && file.size > 32 * 1024 * 1024) throw new Error("Die Datei überschreitet 32 MiB.");
+}
+
+export async function importModelFile(file: File, options: ResolveOptions = {}): Promise<BuilderDocument> {
+  validateImportFile(file);
+  const format = file.name.split(".").pop()?.toLowerCase();
   const bytes = new Uint8Array(await file.arrayBuffer());
   switch (format) {
     case "json": return importInternal(bytes);
