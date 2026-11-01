@@ -33,7 +33,9 @@ import { reuseGeometryCache } from "./ldraw-geometry";
 import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
 import { createSoftwareScene, updateSoftwareScene, previewSoftware, restoreSoftware, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { InstanceIndex, instanceIndex } from "./instance-index";
-import { constructionPosition } from "./stud-snapping";
+import { activeConnections, constructionTransform, hasUsableConnections } from "../connections/engine";
+import { ConnectionOverlay } from "../connections/overlay";
+import type { ConnectionTransform } from "../connections/types";
 import { createBuilderLighting } from "./lighting";
 import type { Affine, ImportedModel } from "../formats/types";
 
@@ -57,7 +59,7 @@ interface BuilderCanvasProps {
   toolMode: ToolMode;
   onPlace: (position: Position3) => void;
   onSelect: (id: string | null) => void;
-  onMove: (id: string, position: Position3) => void;
+  onMove: (id: string, position: Position3, transform?: Affine) => void;
 }
 
 interface PointerPoint {
@@ -84,6 +86,7 @@ interface DragCandidate {
   destination: Position3 | null;
   needsSnap?: boolean;
   matrix?: Affine;
+  connection?: ConnectionTransform;
   planeStart: Position3 | null;
 }
 
@@ -455,6 +458,18 @@ export function BuilderCanvas({
   const rollbackRef = useRef<(() => void) | null>(null);
   const previewBrickRef = useRef<Brick | null>(null);
   const attemptRef = useRef(-1);
+  const overlayRef = useRef<ConnectionOverlay | null>(null);
+  const [showConnections, setShowConnections] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState("");
+  const refreshConnections = () => {
+    const overlay = overlayRef.current, model = propsRef.current.imported, id = propsRef.current.selectedId;
+    if (!overlay) return;
+    if (model !== sceneModelRef.current) { overlay.contacts = []; setConnectionStatus(""); return; }
+    overlay.contacts = model && id ? activeConnections(model, id) : [];
+    const instance = model?.instances.find(value => value.id === id);
+    setConnectionStatus(overlay.contacts.length ? `${overlay.contacts.length} geprüfte Verbindung${overlay.contacts.length === 1 ? "" : "en"}` :
+      instance && model ? hasUsableConnections(model, instance.id) ? "Keine aktive Verbindung" : "Keine nutzbaren Verbindungsdaten · freie Platzierung" : "");
+  };
   const updateImportedSelection = () => {
     const old = selectionOutlineRef.current;
     const id = propsRef.current.selectedId, root = importedRootRef.current;
@@ -548,6 +563,8 @@ export function BuilderCanvas({
     renderer.domElement.style.touchAction = "none";
     renderer.domElement.style.userSelect = "none";
     host.appendChild(renderer.domElement);
+    const overlay = new ConnectionOverlay(host);
+    overlayRef.current = overlay;
     const contextLost = (event: Event) => {
       if (rendererRef.current !== renderer) return;
       event.preventDefault();
@@ -615,6 +632,10 @@ export function BuilderCanvas({
             interactive,
           );
         }
+        overlay.draw(camera, importedOffsetRef.current, id => {
+          const box = importedRootRef.current ? instanceIndex(importedRootRef.current)?.records.get(id)?.bounds : softwareSceneRef.current?.instanceBounds.get(id);
+          return box ?? null;
+        });
         if (interactive) {
           clearTimeout(settleTimer);
           settleTimer = setTimeout(invalidate, 190);
@@ -636,6 +657,7 @@ export function BuilderCanvas({
     invalidate();
 
     return () => {
+      overlay.dispose(); if (overlayRef.current === overlay) overlayRef.current = null;
       resizeObserver.disconnect();
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
       clearTimeout(settleTimer);
@@ -687,6 +709,7 @@ export function BuilderCanvas({
           setSceneStatus(null);
           if (software) setRenderWarning(softwareWarning(software));
           updateImportedSelection();
+          refreshConnections();
           return;
         }
       } catch (error) {
@@ -699,6 +722,7 @@ export function BuilderCanvas({
       try {
         if (updateSoftwareScene(softwareSceneRef.current, imported)) {
           sceneModelRef.current = imported; setSceneStatus(null);
+          refreshConnections();
           setRenderWarning(softwareWarning(softwareSceneRef.current));
           invalidatorRef.current?.(); return;
         }
@@ -786,6 +810,7 @@ export function BuilderCanvas({
       }
       if (root) { scene.add(root); importedRootRef.current = root; }
       updateImportedSelection();
+      refreshConnections();
       setSceneStatus(null);
       invalidatorRef.current?.();
     };
@@ -801,6 +826,15 @@ export function BuilderCanvas({
   }, [imported, buildAttempt, forceCompatibility, projectId]);
 
   useEffect(() => { rollbackRef.current?.(); }, [projectId, toolMode]);
+  useEffect(() => {
+    if (dragRef.current && (dragRef.current.id !== selectedId || sceneModelRef.current !== imported)) rollbackRef.current?.();
+    if (!dragRef.current) refreshConnections();
+    invalidatorRef.current?.();
+  }, [imported, selectedId, projectId]);
+  useEffect(() => {
+    if (overlayRef.current) overlayRef.current.visible = showConnections;
+    invalidatorRef.current?.();
+  }, [showConnections]);
 
   useEffect(() => { updateImportedSelection(); }, [selectedId]);
 
@@ -967,6 +1001,8 @@ export function BuilderCanvas({
       }
       previewBrickRef.current = null;
       dragRef.current = null; clickRef.current = null;
+      if (overlayRef.current) overlayRef.current.contacts = [];
+      setConnectionStatus("");
       updateImportedSelection();
     };
     rollbackRef.current = rollback;
@@ -984,7 +1020,12 @@ export function BuilderCanvas({
       if (!drag.destination || !drag.needsSnap) return;
       if (drag.matrix && propsRef.current.imported) {
         const offset = importedOffsetRef.current;
-        const position = constructionPosition(propsRef.current.imported, drag.id, { ...drag.destination, y: drag.destination.y - offset });
+        const result = constructionTransform(propsRef.current.imported, drag.id, { ...drag.destination, y: drag.destination.y - offset });
+        drag.connection = result;
+        if (overlayRef.current) overlayRef.current.contacts = result.contacts;
+        setConnectionStatus(result.status === "candidate" ? `${result.contacts.length} Verbindungskandidat${result.contacts.length === 1 ? "" : "en"} · beim Loslassen übernehmen` :
+          result.status === "no-data" ? "Keine nutzbaren Verbindungsdaten · freie Platzierung" : "Keine passende Verbindung · freie Platzierung");
+        const position = { x: result.matrix[3] / 20, y: -result.matrix[7] / 20, z: result.matrix[11] / 20 };
         drag.destination = { ...position, y: position.y + offset };
       } else {
         drag.destination.x = Math.round(drag.destination.x * 2) / 2;
@@ -998,7 +1039,7 @@ export function BuilderCanvas({
         resolveDrag(drag);
         const position = drag.destination;
         if (drag.matrix) {
-          const matrix = [...drag.matrix] as Affine;
+          const matrix = [...(drag.connection?.matrix ?? drag.matrix)] as Affine;
           matrix[3] = position.x * 20; matrix[7] = -(position.y - importedOffsetRef.current) * 20; matrix[11] = position.z * 20;
           if (importedRootRef.current) instanceIndex(importedRootRef.current)?.preview(drag.id, matrix);
           if (softwareSceneRef.current) previewSoftware(softwareSceneRef.current, drag.id, matrix);
@@ -1167,9 +1208,11 @@ export function BuilderCanvas({
           resolveDrag(drag);
           if (drag.destination) {
             const destination = { ...drag.destination, y: drag.destination.y - (drag.matrix ? importedOffsetRef.current : 0) };
-            const changed = drag.destination.x !== drag.origin.x || drag.destination.y !== drag.origin.y || drag.destination.z !== drag.origin.z;
+            const changed = drag.destination.x !== drag.origin.x || drag.destination.y !== drag.origin.y || drag.destination.z !== drag.origin.z ||
+              !!drag.connection?.matrix.some((value, i) => value !== drag.matrix?.[i]);
+            const transform = drag.connection?.matrix;
             rollback();
-            if (changed) current.onMove(drag.id, destination);
+            if (changed) current.onMove(drag.id, destination, transform);
           }
         } else if (current.toolMode === "build" && click && !click.moved) {
           const hit = findBrick(point);
@@ -1199,6 +1242,9 @@ export function BuilderCanvas({
     };
 
     const onPointerCancel = (event: PointerEvent) => {
+      // Releasing capture after a completed pointerup emits this too. That is
+      // not a cancellation and must not clear newly verified committed ports.
+      if (!pointersRef.current.has(event.pointerId) && dragRef.current?.pointerId !== event.pointerId) return;
       pointersRef.current.delete(event.pointerId);
       pointerLastRef.current.delete(event.pointerId);
       rollback();
@@ -1228,6 +1274,15 @@ export function BuilderCanvas({
     ? "Kompatibilitätsansicht ohne WebGL: begrenzte Details bei großen Projekten; alle Steine bleiben gespeichert."
     : null;
   return <div ref={hostRef} className="builder-canvas" data-testid="canvas-3d" style={{ position: "relative" }}>
+    <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-2 pointer-events-none">
+      <button type="button" className="pointer-events-auto rounded-xl border bg-white/95 px-3 py-3 text-xs font-semibold shadow-sm"
+        aria-pressed={showConnections} aria-label="Verbindungen anzeigen"
+        onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()}
+        onClick={() => setShowConnections(value => !value)}>
+        Verbindungen {showConnections ? "an" : "aus"}
+      </button>
+      {showConnections && connectionStatus && <span role="status" data-testid="connection-status" className="rounded-lg bg-white/95 px-2 py-2 text-xs shadow-sm">{connectionStatus}</span>}
+    </div>
     {(sceneStatus || renderWarning || compatibilityHint) && <div
       role="status"
       className="absolute left-2 right-2 top-2 z-10 rounded-lg bg-white/95 p-3 text-xs text-stone-700 shadow"

@@ -58,9 +58,13 @@ export function rotateImported(document: BuilderDocument, id: string): BuilderDo
     return { ...instance, matrix };
   });
 }
-export function moveImported(document: BuilderDocument, id: string, position: Position3, snapXZ = true): BuilderDocument {
+export function moveImported(document: BuilderDocument, id: string, position: Position3, snapXZ = true, transform?: Affine): BuilderDocument {
   return editImported(document, id, instance => {
-    const matrix = [...instance.matrix] as Affine;
+    if (transform && (transform.length !== 12 || !transform.every(Number.isFinite))) throw new Error("Ungültige Verbindungstransformation.");
+    const matrix = [...(transform ?? instance.matrix)] as Affine;
+    // Do not divide and multiply the source LDU translation through UI units:
+    // that changes exact off-grid coefficients by floating-point roundoff.
+    if (transform) return { ...instance, matrix };
     matrix[3] = (snapXZ ? Math.round(position.x * 2) / 2 : position.x) * 20;
     matrix[7] = -position.y * 20;
     matrix[11] = (snapXZ ? Math.round(position.z * 2) / 2 : position.z) * 20;

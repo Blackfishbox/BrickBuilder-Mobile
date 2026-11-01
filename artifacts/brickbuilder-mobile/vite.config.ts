@@ -58,7 +58,10 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: `${basePath}index.html`,
-        globPatterns: ['**/*.{js,css,html,svg,webmanifest,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,webmanifest,woff2}', 'licenses/connections/**'],
+        // Includes the pinned, compressed offline connection hierarchy chunk.
+        // No upstream requests or automatic dataset updates are performed.
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         clientsClaim: true,
       },

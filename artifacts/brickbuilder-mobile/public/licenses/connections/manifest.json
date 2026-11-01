@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "shadow": {
+    "url": "https://github.com/RolandMelkert/LDCadShadowLibrary",
+    "revision": "9b1131fb1991f8c0bfc072325e4e12f6271aba35",
+    "license": "CC-BY-SA-4.0",
+    "records": 4285,
+    "constructs": {
+      "SNAP_CLEAR": 332,
+      "SNAP_CLP": 160,
+      "SNAP_CYL": 6740,
+      "SNAP_FGR": 335,
+      "SNAP_GEN": 328,
+      "SNAP_INCL": 506
+    },
+    "payload": {
+      "sha256": "168332606b2866ee3f3bc37192fc9810c97a288bd699b861191c01ea67185058",
+      "decodedBytes": 2296942,
+      "compressedBytes": 396852
+    }
+  },
+  "ldraw": {
+    "url": "https://library.ldraw.org/library/updates/complete.zip",
+    "archiveSha256": "023083918da2d3697c794fb4267975509584f3611b993095874206a803fa610f",
+    "records": 37150,
+    "rejected": {},
+    "payload": {
+      "sha256": "6f319239480febf0fa2cee27ae4c6724fa9bb8365d420b7d0eaf72646d5c9128",
+      "decodedBytes": 31228099,
+      "compressedBytes": 5105036
+    },
+    "adaptation": "Extracted type-1 reference lines, original authors, license declarations and SHA-256 hashes. No geometry."
+  },
+  "specification": "https://www.melkert.net/LDCad/tech/meta",
+  "notice": "Source presence is not evidence of usable connectors. Runtime expansion and matching report rejections separately.",
+  "testExamples": {
+    "roots": [
+      "3001",
+      "3003",
+      "3022",
+      "2780",
+      "3700",
+      "3705",
+      "32064",
+      "30374",
+      "4085a",
+      "4275a",
+      "4276a",
+      "14417",
+      "30396",
+      "2412b"
+    ],
+    "files": 97,
+    "payload": {
+      "sha256": "50b68ebd552e0c5acca39d40d4c3ea5c61ec5797498ab63c231fbec7a98f2214",
+      "decodedBytes": 174007,
+      "compressedBytes": 27131
+    },
+    "notice": "Genuine source geometry for automatic tests only; not installed by the production app."
+  },
+  "legalDocuments": {
+    "ATTRIBUTION.txt": {
+      "sha256": "f8b09509637ee3fe40151368d67a623055c46d640584c61d445ac1dffb380b9b",
+      "bytes": 772
+    },
+    "CC0-1.0.txt": {
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+      "bytes": 7048
+    },
+    "CONTRIBUTING.md": {
+      "sha256": "ce1e04081aa6d28890d735038dbcdc9b8ec6888a5e70a4438238a23726f89259",
+      "bytes": 15393
+    },
+    "LICENSE.md": {
+      "sha256": "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2",
+      "bytes": 20137
+    },
+    "README.md": {
+      "sha256": "fa7f8abe493d408ba4e06da00aabfe398147615eedbacbeba8e55a1f6ac4d8a3",
+      "bytes": 1460
+    },
+    "calicense4.txt": {
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "bytes": 18657
+    },
+    "careadme.txt": {
+      "sha256": "c67a824bdab18e646337b5b26f7f039c84b0be71273c0c878e2749e648820497",
+      "bytes": 4151
+    }
+  }
+}

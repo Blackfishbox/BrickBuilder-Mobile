@@ -6,7 +6,8 @@ import { PerspectiveCamera, Vector3 } from "three";
 import { engineFixture } from "./engine-fixtures";
 import type { SoftwareScene } from "./software-scene";
 import BuilderCanvas from "./BuilderCanvas";
-import * as snapping from "./stud-snapping";
+import * as snapping from "../connections/engine";
+import type { Contact } from "../connections/types";
 
 const observed = vi.hoisted(() => ({ scene: undefined as SoftwareScene | undefined, preparations: 0 }));
 vi.mock("./software-scene", async importOriginal => {
@@ -20,6 +21,11 @@ vi.mock("./software-scene", async importOriginal => {
 let root: Root, element: HTMLDivElement, host: HTMLElement;
 let frames: Map<number, FrameRequestCallback>, nextFrame: number;
 const context = new Proxy({}, { get: () => vi.fn(), set: () => true });
+const contact: Contact = {
+  id: "moving:socket|target:stud", movingId: "moving", movingConnectorId: "socket", targetId: "target", targetConnectorId: "stud",
+  family: "cylinder", position: [0, 0, 0], orientation: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], state: "candidate",
+  evidence: [{ path: "p/stud.dat", line: 8, sha256: "a".repeat(64) }],
+};
 function flushFrame(): void {
   const callbacks = [...frames.values()]; frames.clear();
   act(() => { callbacks.forEach(callback => callback(performance.now())); });
@@ -93,7 +99,7 @@ describe("frame-coalesced drag transactions", () => {
   });
   it("coalesces connection searches and commits the exact off-grid live preview", async () => {
     const { onMove, point } = await mount();
-    const snap = vi.spyOn(snapping, "constructionPosition").mockReturnValue({ x: 0.23, y: 2.4, z: 0.17 });
+    const snap = vi.spyOn(snapping, "constructionTransform").mockReturnValue({ matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" });
     pointer("pointerdown", point.x, point.y);
     for (let n = 1; n <= 20; n++) pointer("pointermove", point.x + n * 4, point.y + 10);
     expect(snap).not.toHaveBeenCalled();
@@ -102,24 +108,34 @@ describe("frame-coalesced drag transactions", () => {
     pointer("pointerup", point.x + 80, point.y + 10);
     expect(snap).toHaveBeenCalledOnce();
     expect(onMove).toHaveBeenCalledOnce();
-    expect(onMove.mock.calls[0][1]).toEqual({ x: 0.23, y: 2.4, z: 0.17 });
+    expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.23);
+    expect(onMove.mock.calls[0][1].y).toBeCloseTo(2.4);
+    expect(onMove.mock.calls[0][1].z).toBeCloseTo(0.17);
+    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.matrix);
   });
   it("resolves a pending connection on release even before the next frame", async () => {
     const { onMove, point } = await mount();
-    const snap = vi.spyOn(snapping, "constructionPosition").mockReturnValue({ x: 0.23, y: 2.4, z: 0.17 });
+    const snap = vi.spyOn(snapping, "constructionTransform").mockReturnValue({ matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" });
     pointer("pointerdown", point.x, point.y);
     pointer("pointermove", point.x + 80, point.y + 10);
     pointer("pointerup", point.x + 80, point.y + 10);
     expect(snap).toHaveBeenCalledOnce();
-    expect(onMove.mock.calls[0][1]).toEqual({ x: 0.23, y: 2.4, z: 0.17 });
+    expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.23);
+    expect(onMove.mock.calls[0][1].y).toBeCloseTo(2.4);
+    expect(onMove.mock.calls[0][1].z).toBeCloseTo(0.17);
+    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.matrix);
   });
   for (const cancellation of ["pointercancel", "lostpointercapture", "multitouch", "project", "blur"]) {
     it(`rolls back ${cancellation} without changing the document`, async () => {
       const { onMove, point, props } = await mount(), original = observed.scene!.positions.slice();
+      vi.spyOn(snapping, "constructionTransform").mockReturnValue({
+        matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [contact], status: "candidate",
+      });
       pointer("pointerdown", point.x, point.y);
       pointer("pointermove", point.x + 80, point.y + 10);
       flushFrame();
       expect(observed.scene!.positions).not.toEqual(original);
+      expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("Verbindungskandidat");
       if (cancellation === "multitouch") pointer("pointerdown", point.x - 50, point.y, 2);
       else if (cancellation === "project") await act(async () => { root.render(<BuilderCanvas {...props} projectId="two" imported={undefined} />); });
       else if (cancellation === "blur") act(() => window.dispatchEvent(new Event("blur")));
@@ -128,6 +144,33 @@ describe("frame-coalesced drag transactions", () => {
       expect(onMove).not.toHaveBeenCalled();
       expect(props.onSelect).toHaveBeenCalledTimes(1);
       expect(observed.scene!.positions).toEqual(original);
+      expect(element.querySelector("[data-testid='connection-status']")).toBeNull();
     });
   }
+  it("refreshes committed markers after edits, history, selection and project changes", async () => {
+    const { model, props } = await mount();
+    const active = vi.spyOn(snapping, "activeConnections").mockImplementation((current, id) =>
+      current.instances[0].matrix[3] === 0 && id === model.instances[0].id ? [{ ...contact, state: "verified" }] : []);
+    const changed = { ...model, instances: model.instances.map(i => ({ ...i, matrix: [...i.matrix] as typeof i.matrix })) };
+    await act(async () => root.render(<BuilderCanvas {...props} imported={changed} />));
+    expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("geprüfte Verbindung");
+    // Browsers dispatch capture loss after pointerup. No active pointer means
+    // the committed selection must keep its verified contacts.
+    pointer("lostpointercapture", 0, 0);
+    expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("geprüfte Verbindung");
+    const shifted = { ...changed, instances: changed.instances.map(i => ({ ...i, matrix: [1, 0, 0, 20, 0, 1, 0, 0, 0, 0, 1, 0] as typeof i.matrix })) };
+    await act(async () => root.render(<BuilderCanvas {...props} imported={shifted} />));
+    expect(element.querySelector("[data-testid='connection-status']")?.textContent).not.toContain("geprüfte Verbindung");
+    await act(async () => root.render(<BuilderCanvas {...props} imported={changed} />));
+    expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("geprüfte Verbindung");
+    const button = element.querySelector("[aria-label='Verbindungen anzeigen']")!;
+    act(() => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(element.querySelector("[data-testid='connection-status']")).toBeNull();
+    act(() => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(element.querySelector("[data-testid='connection-status']")).not.toBeNull();
+    await act(async () => root.render(<BuilderCanvas {...props} imported={changed} selectedId={null} />));
+    expect(element.querySelector("[data-testid='connection-status']")).toBeNull();
+    expect(active).toHaveBeenCalled();
+  });
 });

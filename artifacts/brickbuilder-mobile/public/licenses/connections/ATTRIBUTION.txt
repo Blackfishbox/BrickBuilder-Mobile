@@ -1,0 +1,11 @@
+LDCad Shadow Library, Roland Melkert and contributors, revision 9b1131fb1991f8c0bfc072325e4e12f6271aba35.
+https://github.com/RolandMelkert/LDCadShadowLibrary
+Original shadow files are redistributed in a losslessly compressed container.
+Shadow data and adaptations: Creative Commons Attribution-ShareAlike 4.0.
+See LICENSE.md, README.md and CONTRIBUTING.md. No application-wide relicensing.
+
+LDraw.org contributors: authors and original per-file license declarations are
+retained in the separately compressed reference graph. Changes: reference-only
+extraction; no source geometry is redistributed in this connection dataset.
+See careadme.txt and calicense4.txt. CC0 files retain their CC0 declaration.
+The application source code is separate from these licensed datasets.

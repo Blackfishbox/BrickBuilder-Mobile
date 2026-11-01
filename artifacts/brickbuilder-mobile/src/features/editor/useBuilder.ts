@@ -19,7 +19,8 @@ import { refreshedCatalogModel } from "../catalog/refresh-model";
 import { resolveColor } from "../formats/colors";
 import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, placeInventoryPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
 import { inheritStackingBounds } from "../engine/stacking";
-import { constructionPosition } from "../engine/stud-snapping";
+import { constructionTransform } from "../connections/engine";
+import type { Affine } from "../formats/types";
 import type { Inventory, InventoryChoice } from "../inventory/types";
 import { replaceInventory, requireAvailable } from "../inventory/accounting";
 import {
@@ -305,8 +306,8 @@ export function useBuilder() {
           inheritStackingBounds(document.imported, next.imported!);
           const instance = next.imported!.instances.at(-1)!;
           const origin = { x: position.x, y: -instance.matrix[7] / 20, z: position.z };
-          const raised = constructionPosition(next.imported!, id, origin);
-          next = moveImported(next, id, raised, false);
+           const result = constructionTransform(next.imported!, id, origin);
+           next = moveImported(next, id, { x: result.matrix[3] / 20, y: -result.matrix[7] / 20, z: result.matrix[11] / 20 }, false, result.matrix);
           return next;
         });
         setSelectedId(id); setPartError(null);
@@ -316,9 +317,9 @@ export function useBuilder() {
   );
 
   const move = useCallback(
-    (id: string, position: Position3) => {
+    (id: string, position: Position3, transform?: Affine) => {
       if (historyRef.current.document.imported?.instances.some(instance => instance.id === id)) {
-        updateDocument(document => moveImported(document, id, position, false));
+        updateDocument(document => moveImported(document, id, position, false, transform));
         return;
       }
       const snapped = snapPosition(position);

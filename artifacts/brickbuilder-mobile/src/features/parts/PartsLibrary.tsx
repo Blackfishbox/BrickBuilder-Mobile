@@ -107,6 +107,17 @@ export default function PartsLibrary({ online, selectedPartId, loading = false, 
       </div>
 
       <CatalogPanel />
+      <details className="rounded-lg border p-3 text-xs">
+        <summary className="cursor-pointer py-2 font-semibold">Verbindungsdaten und Lizenzen</summary>
+        <p className="py-2">LDCad Shadow Library · Roland Melkert und Mitwirkende · CC BY-SA 4.0.
+          Der geprüfte Datenstand ist offline enthalten. Verfügbare Metadaten bedeuten nicht, dass jede Verbindung geprüft oder geometrisch möglich ist.</p>
+        <div className="flex flex-wrap gap-3 underline">
+          <a href={`${import.meta.env.BASE_URL}licenses/connections/ATTRIBUTION.txt`} target="_blank" rel="noreferrer">Quellen und Bearbeitungen</a>
+          <a href={`${import.meta.env.BASE_URL}licenses/connections/LICENSE.md`} target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
+          <a href={`${import.meta.env.BASE_URL}licenses/connections/manifest.json`} target="_blank" rel="noreferrer">Datenstand und Prüfsummen</a>
+          <a href={`${import.meta.env.BASE_URL}licenses/connections/coverage.json`} target="_blank" rel="noreferrer">Abdeckung und Ausschlüsse</a>
+        </div>
+      </details>
       {installedError && (
         <div className="plib-alert" role="alert">
           <AlertTriangle size={14} /><span>{installedError}</span>

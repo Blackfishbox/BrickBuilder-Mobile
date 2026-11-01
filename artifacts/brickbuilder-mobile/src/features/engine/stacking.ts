@@ -5,33 +5,36 @@ import { compilePart, reuseGeometryCache, worldMatrix } from "./ldraw-geometry";
 
 const instanceBounds = new WeakMap<ImportedInstance, { resources: ImportedModel["resources"]; box: Box3 }>();
 const modelBounds = new WeakMap<ImportedModel, Map<string, Box3>>();
+const localBounds = new WeakMap<ImportedModel["resources"], Map<string, Box3>>();
+
+/** Exact local source bounds are shared by collision queries for rotated snaps. */
+export function localPartBounds(model: ImportedModel, reference: string): Box3 {
+  const cache = localBounds.get(model.resources) ?? new Map<string, Box3>();
+  localBounds.set(model.resources, cache);
+  const old = cache.get(reference); if (old) return old;
+  const box = new Box3(), point = new Vector3();
+  for (const surface of compilePart(model, reference, "16")) {
+    for (let i = 0; i < surface.positions.length; i += 3) box.expandByPoint(point.fromArray(surface.positions, i));
+  }
+  cache.set(reference, box); return box;
+}
 
 /** Conservative broad-phase bounds, cached independently of temporary drag previews. */
 export function stackingBounds(model: ImportedModel): Map<string, Box3> {
   const cached = modelBounds.get(model);
   if (cached) return cached;
   const result = new Map<string, Box3>();
-  const local = new Map<string, Box3>();
   for (const instance of model.instances) {
     if (instance.part.status !== "resolved") continue;
     let entry = instanceBounds.get(instance);
     if (!entry || entry.resources !== model.resources) {
-      let box = local.get(instance.reference);
-      if (!box) {
-        box = new Box3();
-        const point = new Vector3();
-        let surfaces;
-        try { surfaces = compilePart(model, instance.reference, "16"); }
+      let box: Box3;
+        try { box = localPartBounds(model, instance.reference); }
         catch {
           // Missing geometry is already reported by import diagnostics; it cannot
           // supply a collision volume and must not prevent editing valid parts.
           continue;
         }
-        for (const surface of surfaces) {
-          for (let i = 0; i < surface.positions.length; i += 3) box.expandByPoint(point.fromArray(surface.positions, i));
-        }
-        local.set(instance.reference, box);
-      }
       entry = { resources: model.resources, box: box.clone().applyMatrix4(worldMatrix(instance.matrix)) };
       instanceBounds.set(instance, entry);
     }

@@ -137,9 +137,18 @@ describe("reviewed standard stud connections", () => {
   it("rejects a candidate blocked by geometry without reviewed connectors", () => {
     const model = fixture([
       { part: "3001" },
-      { part: "3003", y: 2.4, basis: [-1, 0, 0, 0, 1, 0, 0, 0, 1] },
+      { part: "3003", y: 2.4 },
       { part: "3003", x: 8 },
     ]);
+    // Reflections are now supported according to the source mirror policy.
+    // Use real flattened source triangles with no connection hierarchy instead.
+    const triangles = geometry.compilePart(model, "3003.dat", "16").flatMap(surface => {
+      const lines: string[] = [];
+      for (let i = 0; i < surface.positions.length; i += 9) lines.push(`3 16 ${[...surface.positions.slice(i, i + 9)].join(" ")}`);
+      return lines;
+    }).join("\n");
+    model.resources = { ...model.resources, "parts/obstacle.dat": { ...model.resources["parts/3003.dat"], path: "parts/obstacle.dat", content: triangles } };
+    model.instances[1] = { ...model.instances[1], reference: "obstacle.dat" };
     expect(snapStudConnection(model, model.instances[2].id, { x: 0.05, y: 1.2, z: 0.05 })).toBeNull();
     expect(constructionPosition(model, model.instances[2].id, { x: 0.05, y: 1.2, z: 0.05 }).y).toBeGreaterThan(2.4);
   });

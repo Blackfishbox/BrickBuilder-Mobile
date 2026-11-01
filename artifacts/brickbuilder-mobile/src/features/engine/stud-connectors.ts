@@ -8,6 +8,8 @@ export interface StudDefinition {
   height: number;
 }
 
+// Historical geometry fixtures only, not the engine's coverage boundary.
+// Production connection descriptions live in ../connections/description.ts.
 // Explicit first-party connection descriptions, checked against the original
 // files in the two bundled LDraw packages. No BrickLink-ID guessing or suffix
 // stripping: printed, hollow-stud and other variants require their own review.
