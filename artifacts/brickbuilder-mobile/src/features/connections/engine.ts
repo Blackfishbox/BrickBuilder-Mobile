@@ -149,11 +149,12 @@ function obstructed(model: ImportedModel, id: string, proposed: Affine, contacts
   }
   return false;
 }
-const boundsCaches = new WeakMap<ImportedModel, { cells: Map<string, string[]>; columns: Map<string, string[]>; wide: string[] }>();
+const boundsCaches = new WeakMap<ImportedModel, { cells: Map<string, string[]>; columns: Map<string, string[]>; wide: string[]; floor: number }>();
 function boundsIndex(model: ImportedModel) {
   const old = boundsCaches.get(model); if (old) return old;
-  const index = { cells: new Map<string, string[]>(), columns: new Map<string, string[]>(), wide: [] as string[] };
+  const index = { cells: new Map<string, string[]>(), columns: new Map<string, string[]>(), wide: [] as string[], floor: 0 };
   for (const [id, box] of stackingBounds(model)) {
+    index.floor = Math.min(index.floor, box.min.y);
     const b = box.clone().applyMatrix4(new Matrix4().makeScale(20, -20, 20));
     const size = b.getSize(new Vector3()).divideScalar(CELL).addScalar(2);
     if (size.x * size.y * size.z > 512) index.wide.push(id);
@@ -221,7 +222,7 @@ export function snapConnection(model: ImportedModel, id: string, desired: Positi
   desiredMatrix[3] = desired.x * 20; desiredMatrix[7] = -desired.y * 20; desiredMatrix[11] = desired.z * 20;
   const local = describeConnections(instance.reference, model).connectors;
   let floor: number;
-  try { floor = Math.min(0, localPartBounds(model, instance.reference).clone().applyMatrix4(worldMatrix(desiredMatrix)).min.y); }
+  try { floor = Math.min(boundsIndex(model).floor, localPartBounds(model, instance.reference).clone().applyMatrix4(worldMatrix(desiredMatrix)).min.y); }
   catch { return null; } // Import diagnostics own missing/invalid source geometry.
   const moving = local.map(c => transformConnector(c, desiredMatrix)).filter((c): c is Connector => !!c);
   const shift = new Vector3(desiredMatrix[3] - instance.matrix[3], desiredMatrix[7] - instance.matrix[7], desiredMatrix[11] - instance.matrix[11]);
@@ -274,7 +275,7 @@ export function snapConnection(model: ImportedModel, id: string, desired: Positi
         const targetSource = describeConnections(entry.instance.reference, model).connectors.find(c => c.id === b.id)!;
         const targetAnchor = new Vector3(targetSource.frame[3], targetSource.frame[7], targetSource.frame[11])
           .applyMatrix4(matrix4(entry.instance.matrix).setPosition(0, 0, 0));
-        transform.setPosition(targetAnchor.addScaledVector(bb.y, -offset).sub(anchor)
+        transform.setPosition(targetAnchor.addScaledVector(bb.y, offset).sub(anchor)
           .add(new Vector3(entry.instance.matrix[3], entry.instance.matrix[7], entry.instance.matrix[11])));
         const matrix = affine(transform), key = matrix.map(n => n.toFixed(5)).join(",");
         if (tried.has(key)) continue; tried.add(key);

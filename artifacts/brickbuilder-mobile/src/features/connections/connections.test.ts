@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeConnections, transformConnector } from "./description";
+import { describeConnections, transformConnector, matrix4 } from "./description";
 import { potentialPair, profileOverlap } from "./profiles";
 import { activeConnections, constructionTransform, snapConnection } from "./engine";
 import { connectionFixture, partLine } from "./fixtures";
@@ -103,6 +103,36 @@ describe("oriented connection transactions", () => {
     const snap = snapConnection(model, id, { x: 0.03, y: -0.5, z: 0.5 });
     expect(snap?.contacts.some(c => c.evidence.some(e => e.path === "parts/3673.dat"))).toBe(true);
     expect(snap!.matrix.some((v, i) => ![3, 7, 11].includes(i) && v !== model.instances[1].matrix[i])).toBe(true);
+  });
+  it("commits the validated nonzero depth of a genuine asymmetric friction-pin profile", () => {
+    // Unlike the symmetric complete pin, confric5 has one base collar and a
+    // single flexible tip: R8/2, R6/16, _L6.25/2, non-centered, capped A.
+    // It is genuine licensed primitive geometry inherited by 2780.
+    const model = connectionFixture([partLine("3700"), partLine("confric5", 160, 10, 12)].join("\n"));
+    const id = model.instances[1].id;
+    const snap = snapConnection(model, id, { x: 0.02, y: -0.5, z: 0.6 });
+    expect(snap).not.toBeNull();
+    expect(snap!.matrix[3]).toBe(0);
+    expect(snap!.matrix[7]).toBe(10);
+    expect(snap!.matrix[11]).toBe(12); // Not -12: the collar stays at the near mouth.
+    const document = { ...createEmptyDocument(), imported: model };
+    const committed = moveImported(document, id, { x: 0, y: -0.5, z: 0.6 }, false, snap!.matrix);
+    expect(committed.imported!.instances[1].id).toBe(id);
+    expect(activeConnections(committed.imported!, id)).toHaveLength(1);
+    const persisted = importInternal(exportInternal(committed));
+    expect(persisted.imported!.instances[1].matrix).toEqual(snap!.matrix);
+    // Importing a JSON file creates a new project with fresh instance IDs.
+    const contacts = activeConnections(persisted.imported!, persisted.imported!.instances[1].id);
+    expect(contacts).toHaveLength(1);
+    expect(contacts[0]).toMatchObject({ state: "verified", movingConnectorId: snap!.contacts[0].movingConnectorId });
+    expect(contacts[0].evidence.some(e => e.path === "p/confric5.dat")).toBe(true);
+    const moving = transformConnector(describeConnections("confric5.dat", model).connectors[0], snap!.matrix)!;
+    const target = describeConnections("3700.dat", persisted.imported!).connectors.find(c => c.evidence.path === "p/connhole.dat")!;
+    const worldTarget = transformConnector(target, model.instances[0].matrix)!;
+    const inverse = matrix4(worldTarget.frame).invert(), relative = matrix4(moving.frame).premultiply(inverse);
+    expect(relative.elements[13]).toBe(-12);
+    expect(profileOverlap(moving, worldTarget, -12, -1)).toBe(true);
+    expect(profileOverlap(moving, worldTarget, 12, -1)).toBe(false);
   });
   it("snaps the genuine axle and clip examples using actual geometry", () => {
     for (const [target, moving, position] of [

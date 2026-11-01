@@ -79,7 +79,7 @@ export function profileOverlap(a: Connector, b: Connector, offset: number, direc
     if (capped(male, "A") && capped(female, "B") && Math.abs(ahi - bhi) > EPS) return false;
   }
   if (!clip) {
-    // A = negative-Y end, B = positive-Y end. A cap forbids the
+    // A = positive-Y (bottom) end, B = negative-Y (top) end. A cap forbids the
     // counterpart's solid profile from continuing through that end.
     if (alo < blo - EPS && capped(b, "B") || ahi > bhi + EPS && capped(b, "A")) return false;
     const aNeg = direction > 0 ? "B" : "A", aPos = direction > 0 ? "A" : "B";

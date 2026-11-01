@@ -32,7 +32,7 @@ const report = {
   expandedConnectorDescriptions: expanded, familyParts, uniqueDiagnostics: diagnostics,
   meaning: "Parsed connectors are not certified part-pair connections. Geometry must be installed, transforms and profile constraints must match, contacts must be free and obstruction checks must pass.",
   testedExamples: {
-    cylinder: ["3001/3003", "2780/3700", "3705/32064"],
+    cylinder: ["3001/3003", "2780/3700", "3705/32064", "p/confric5.dat/3700"],
     clip: ["30374/4085a"], fingers: ["p/h1.dat/p/h2.dat"],
     generic: ["14417/30396"],
   },

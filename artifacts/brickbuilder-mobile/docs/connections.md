@@ -109,6 +109,11 @@ generic group/explicit-size connectors. Genuine examples cover ordinary
 studs/anti-studs, `2780`/`3700` pin/hole, `3705`/`32064` axle/hole,
 `30374`/`4085a` bar/clip, `p/h1.dat`/`p/h2.dat` fingers, and
 `14417`/`30396` free spherical generic joints.
+The asymmetric, non-centered `p/confric5.dat` friction-pin profile is also
+inserted at a nonzero depth into `3700`; its committed matrix and recomputed
+contacts are checked after an internal JSON round trip. Candidate offsets and
+applied translations both use the moving origin in the target's positive local
+Y frame, so opposite insertion depths cannot be silently interchanged.
 
 Matching aligns actual frames, not just upright Y-axis quarter-turns.
 Axle/square fits retain fourfold roll alignment; round profiles retain
@@ -149,6 +154,9 @@ frame, and commits one inventory-aware document transaction on release.
 Original source bytes, hierarchy, legal metadata, allocation and instance ID
 are unchanged. History, autosave and internal JSON store the complete matrix.
 Explicit height controls bypass connection/stacking resolution.
+Imported models retain their existing display-floor offset when an oriented
+snap changes a part's vertical bounds; rotation is not constrained to the
+moving part's old upright lower face.
 
 Contact descriptors carry stable instance/connector IDs, location, orientation,
 family, candidate/verified state and source evidence. Green committed markers
