@@ -18,6 +18,15 @@ for supported formats, verification history and limitations.
 The [complete catalog guide](artifacts/brickbuilder-mobile/docs/complete-catalog.md)
 documents all published source rows, directional mappings, coverage and offline use.
 
+## Features
+
+- Touch-oriented 3D editing with camera controls, snapping and connection indicators.
+- Individual part selection, movement, rotation, colors, deletion and undo/redo.
+- LDraw parts library with downloadable packages and verified geometry caching.
+- BrickLink XML/CSV inventories with quantity limits when building from a list.
+- IO, LDR, MPD and internal JSON import, with format-specific export limitations.
+- Local projects and autosave in IndexedDB, plus an installable offline-capable PWA.
+
 ## Quick start
 
 Tested environment: **Linux x86-64, Node.js 24.22.1, pnpm 10.26.1**.
@@ -55,6 +64,16 @@ Production preview is for local verification, not an internet-facing production 
 static hosting, root/subpath deployments, HTTPS/PWA caching, browser storage,
 optional API services and troubleshooting.
 
+## Documentation
+
+- [Application overview and format support](artifacts/brickbuilder-mobile/README.md)
+- [Editing guide](artifacts/brickbuilder-mobile/docs/editing.md)
+- [Catalog, part IDs and colors](artifacts/brickbuilder-mobile/docs/complete-catalog.md)
+- [Large-model performance](artifacts/brickbuilder-mobile/docs/performance.md)
+- [Setup and hosting](docs/setup-and-hosting.md)
+- [Automated server installation](docs/self-host-installer.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+
 ## Repository map
 
 - `artifacts/brickbuilder-mobile/` — React, TypeScript, Vite, Three.js, Dexie and PWA.
@@ -65,7 +84,7 @@ optional API services and troubleshooting.
 - `scripts/` — maintenance and sanitized GitHub backup utilities.
 - `artifacts/mockup-sandbox/` — separate development preview; not needed to host the app.
 
-## Contribution and distribution rules
+## Contributing
 
 First-party documentation, code comments, test descriptions and development-facing
 explanations are **English**. Application labels, notifications, localized errors,
@@ -73,9 +92,8 @@ manifest locale and other user-visible content remain **German**. Preserve
 third-party source files, original credits and authoritative license texts verbatim.
 Use specific English commit subjects and bodies; do not rewrite existing history.
 
-GitHub backups are sanitized source snapshots, appended by fast-forward push.
-Private uploads, credentials, local agent context and generated output must not
-be included. Tests needing private uploads skip explicitly when those files are
+Keep private uploads, credentials, local agent context and generated output out
+of commits. Tests needing private uploads skip explicitly when those files are
 absent; independent synthetic regressions run normally.
 
 LDraw resources are separately licensed from application code. See
@@ -440,59 +458,9 @@ browser storage availability, not an unlimited offline parts promise.
 Back up configuration, approved datasets and previous deployment artifacts;
 each user must separately export/verify backups of local projects.
 
-## Which license can be used for GitHub publication?
+## License
 
-**MIT applies to independently authored first-party application code and
-documentation, with explicit third-party/data exclusions.** You must hold the necessary rights to
-your own contributions. An MIT application can use separately licensed LDraw
-data; using that data does not automatically make every independently written
-React/Three.js module CC-licensed.
-
-The full [root LICENSE](LICENSE) names Blackfishbox and contributors and
-expressly excludes third-party material. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-documents resource-specific conditions and source evidence. Retain both files
-and the original upstream notices when redistributing. The installer includes
-copies under the static application's `licenses/first-party/` directory.
-Neither notice grants rights that a contributor does not hold.
-
-| Material | Applicable terms | Distribution obligations |
-| --- | --- | --- |
-| Independently authored application source | MIT is a suitable permissive option; other compatible software licenses may be chosen by the rights holder | Add the actual license grant; preserve notices from contributed/copied code |
-| Reviewed LDraw geometry and extracted reference data | Per-file CC BY 4.0, the offered CC BY 4.0 option in dual-licensed files, or CC0; legacy/other files must be checked separately | Preserve original authors/headers and required copyright/license notices; provide source/license links; identify adaptations; retain included legal texts |
-| LDCad Shadow connection dataset and adaptations | **CC BY-SA 4.0** | Attribution and license link/text; mark modifications; distribute adaptations under the same license or an allowed compatible license; do not impose conflicting restrictions |
-| Rebrickable CSV-derived IDs, names, colors and mappings | Rebrickable's published terms, especially 5.1 and 5.3; **not a blanket CC BY or MIT dataset** | Use permitted downloads, retain provenance/attribution, recheck terms and any separate permissions needed for your distribution; no MOC scraping or AI-training reuse |
-| npm/runtime dependencies | Each package's own license, including transitive dependencies | Retain applicable license/copyright/NOTICE texts; review the production dependency tree for each release |
-| Private models, images, instructions and Studio resources | Their actual authors'/owners' rights | No permission to redistribute is implied by importing them; keep private uploads out of Git |
-
-**A `.ts` extension does not make embedded third-party data MIT.** Compressed
-shadow/reference datasets in generated source modules retain their data
-licenses. Share-alike applies to covered adaptations, not automatically to
-unrelated app code; keep those boundaries explicit. Simply choosing GPL, MIT
-or CC for the whole repository is not a substitute for preserving upstream
-rights, attribution and source-specific conditions.
-
-Preserve and ship `public/licenses/connections/`, original LDraw package legal
-files and all data manifests/credits. Existing detailed evidence:
-
-- [LDraw package review](artifacts/brickbuilder-mobile/docs/parts-licensing.md)
-- [Import geometry](artifacts/brickbuilder-mobile/docs/import-geometry-licensing.md)
-- [LDCad connections and reference graph](artifacts/brickbuilder-mobile/docs/connections.md#source-and-licensing)
-- [BrickLink mapping evidence](artifacts/brickbuilder-mobile/docs/bricklink-mapping-licensing.md)
-- [Complete Rebrickable catalog](artifacts/brickbuilder-mobile/docs/complete-catalog.md)
-
-LEGO, BrickLink, Studio, LDraw and Rebrickable names/logos are not licensed
-merely by choosing a software license. Do not imply endorsement, copy Studio
-code/resources or scrape proprietary catalog assets. No catalog prices,
-availability, images or comprehensive Studio compatibility are promised by
-the mapping dataset.
-
-Primary references checked 2026-11-01:
-[MIT terms](https://choosealicense.com/licenses/mit/),
-[LDraw contributor agreement](https://library.ldraw.org/documentation/licenses-and-legal/ldraworg-contributor-agreement),
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
-[LDCad upstream license](https://github.com/RolandMelkert/LDCadShadowLibrary/blob/master/LICENSE.md),
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
-[Rebrickable terms](https://rebrickable.com/terms/).
-This is a technical source/license assessment, **not legal advice or a warranty
-of complete rights clearance**. Obtain legal review for a commercial release
-or uncertain material.
+First-party application code and documentation are available under the
+[MIT License](LICENSE). Third-party libraries, geometry and catalog datasets
+retain their respective terms; see [Third-party notices](THIRD_PARTY_NOTICES.md)
+for attribution, licenses and detailed documentation.
