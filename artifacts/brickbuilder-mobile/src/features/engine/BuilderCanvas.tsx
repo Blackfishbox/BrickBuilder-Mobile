@@ -33,6 +33,7 @@ import { reuseGeometryCache } from "./ldraw-geometry";
 import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
 import { createSoftwareScene, updateSoftwareScene, previewSoftware, restoreSoftware, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { InstanceIndex, instanceIndex } from "./instance-index";
+import { stackedPosition } from "./stacking";
 import { createBuilderLighting } from "./lighting";
 import type { Affine, ImportedModel } from "../formats/types";
 
@@ -1122,6 +1123,11 @@ export function BuilderCanvas({
               y: start.origin.y,
               z: Math.round((start.origin.z + destination.z - (start.planeStart?.z ?? start.origin.z)) * 2) / 2,
             };
+            if (start.matrix && propsRef.current.imported) {
+              const offset = importedOffsetRef.current;
+              const raised = stackedPosition(propsRef.current.imported, start.id, { ...start.destination, y: start.destination.y - offset });
+              start.destination.y = raised.y + offset;
+            }
             queuePreview(start);
           }
           return;
@@ -1150,7 +1156,7 @@ export function BuilderCanvas({
         if (drag?.pointerId === event.pointerId && drag.moved) {
           if (drag.destination) {
             const destination = { ...drag.destination, y: drag.destination.y - (drag.matrix ? importedOffsetRef.current : 0) };
-            const changed = drag.destination.x !== drag.origin.x || drag.destination.z !== drag.origin.z;
+            const changed = drag.destination.x !== drag.origin.x || drag.destination.y !== drag.origin.y || drag.destination.z !== drag.origin.z;
             rollback();
             if (changed) current.onMove(drag.id, destination);
           }

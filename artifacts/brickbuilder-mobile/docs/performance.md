@@ -1,5 +1,24 @@
 # Large-model rendering
 
+## Construction height and automatic stacking
+
+- Moving an LDraw part checks its translated world-space bounding box against
+  cached bounds of other resolved parts. Overlaps raise the drag preview onto
+  the intersected stack; moving away recomputes from the initial drag height.
+  The lifted position is committed once on release through the normal undo path.
+- New catalog and inventory placements use the same collision rule. Inventory
+  allocation and the adjusted transform remain a single document commit.
+- Selection actions expose **Höher** / **Tiefer**, in increments of one plate
+  (8 LDU / 0.4 studs). Explicit height edits deliberately bypass automatic
+  lifting, including downward movement; undo/redo and autosave remain available.
+- Collision volumes are conservative axis-aligned bounds, not exact solid-body
+  or connector geometry. Studs, hollow parts, slopes and rotated pieces may leave
+  clearance or trigger a lift without a true surface intersection. Unresolved
+  geometry cannot provide collision bounds; existing import warnings still apply.
+- Bounds are cached per immutable model/instance; an established drag does not
+  recompile geometry. Each pointer update scans cached boxes, so this is not a
+  spatial-tree collision engine or a physical Android frame-rate guarantee.
+
 ## Implemented safeguards
 
 - Compile each normalized LDraw reference once, independently of its inherited

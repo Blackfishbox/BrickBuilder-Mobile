@@ -18,6 +18,7 @@ import { ensureCatalog, resolveStoredInventory, useCatalog } from "../catalog/cl
 import { refreshedCatalogModel } from "../catalog/refresh-model";
 import { resolveColor } from "../formats/colors";
 import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, placeInventoryPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
+import { inheritStackingBounds, stackedPosition } from "../engine/stacking";
 import type { Inventory, InventoryChoice } from "../inventory/types";
 import { replaceInventory, requireAvailable } from "../inventory/accounting";
 import {
@@ -296,10 +297,15 @@ export function useBuilder() {
       try {
         let id: string | null = null;
         updateDocument(document => {
-          const next = selection.inventory
+          let next = selection.inventory
             ? placeInventoryPart(document, selection.prepared, position, selection.inventory)
             : placePreparedPart(document, selection.prepared, position, selectedColor, selectedColorCode);
           id = next.imported!.instances.at(-1)!.id;
+          inheritStackingBounds(document.imported, next.imported!);
+          const instance = next.imported!.instances.at(-1)!;
+          const origin = { x: instance.matrix[3] / 20, y: -instance.matrix[7] / 20, z: instance.matrix[11] / 20 };
+          const raised = stackedPosition(next.imported!, id, origin);
+          if (raised.y !== origin.y) next = moveImported(next, id, raised);
           return next;
         });
         setSelectedId(id); setPartError(null);
@@ -353,6 +359,19 @@ export function useBuilder() {
     },
     [updateDocument],
   );
+
+  // Explicit vertical edits bypass auto-stacking so users retain full height control.
+  const changeHeight = useCallback((delta: number) => {
+    if (!selectedId) return;
+    const document = historyRef.current.document;
+    const instance = document.imported?.instances.find(value => value.id === selectedId);
+    const brick = document.bricks.find(value => value.id === selectedId);
+    if (instance) move(selectedId, { x: instance.matrix[3] / 20, y: -instance.matrix[7] / 20 + delta, z: instance.matrix[11] / 20 });
+    else if (brick) updateDocument(current => ({
+      ...current, updatedAt: new Date().toISOString(),
+      bricks: current.bricks.map(value => value.id === selectedId ? { ...value, y: value.y + delta } : value),
+    }));
+  }, [selectedId, move, updateDocument]);
 
   const select = useCallback(
     (id: string | null) => {
@@ -525,6 +544,7 @@ export function useBuilder() {
     select,
     place,
     move,
+    changeHeight,
     rotateSelected,
     deleteSelected,
     undo: undoChange,

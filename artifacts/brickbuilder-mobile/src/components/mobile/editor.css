@@ -253,7 +253,7 @@ button:focus-visible { outline: 3px solid rgba(190,92,65,.38); outline-offset: 2
     padding: 5px; border: 1px solid #e1ddd0; border-radius: 11px; background: rgba(250,248,240,.93);
     box-shadow: 0 4px 14px rgba(39,57,48,.12); backdrop-filter: blur(10px);
   }
-  .mobile-selection-label { display: flex; align-items: center; gap: 5px; padding: 0 7px; color: #64766a; font-size: 9px; font-weight: 700; }
+  .mobile-selection-label { display: flex; align-items: center; gap: 5px; padding: 0 7px; max-width: 100px; overflow: hidden; color: #64766a; font-size: 9px; font-weight: 700; }
    .mobile-selection-actions button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 8px; background: #f0eee4; color: #5a7263; cursor: pointer; }
   .mobile-selection-actions button:last-child { color: #ad513c; }
   .context-label { font-size: 8px; }

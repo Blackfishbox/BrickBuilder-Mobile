@@ -293,6 +293,8 @@ function App() {
           {editor.selectedId && (
             <div className="mobile-selection-actions" data-testid="mobile-selection-actions">
               <span className="mobile-selection-label"><Box size={14} /> {editor.selectedInstance ? `LDraw ${editor.selectedInstance.part.ldrawId}` : "Stein ausgewählt"}</span>
+              <button type="button" onClick={() => editor.changeHeight(0.4)} aria-label="Stein eine Plattenhöhe höher" title="Höher (+1 Platte)">↑</button>
+              <button type="button" onClick={() => editor.changeHeight(-0.4)} aria-label="Stein eine Plattenhöhe tiefer" title="Tiefer (−1 Platte)">↓</button>
               <button type="button" onClick={editor.rotateSelected} aria-label="Ausgewählten Stein drehen" data-testid="mobile-button-rotate"><RotateCw size={17} /></button>
               <button type="button" onClick={editor.deleteSelected} aria-label="Ausgewählten Stein entfernen" data-testid="mobile-button-delete-selected"><Trash2 size={17} /></button>
             </div>
@@ -361,6 +363,8 @@ function App() {
                   <span><strong>{editor.selectedInstance ? `LDraw ${editor.selectedInstance.part.ldrawId}` : `${selectedBrick.dimensions} Stein`}</strong><small>Kann bearbeitet werden</small></span>
                 </div>
                 <div className="selection-actions">
+                  <button type="button" className="selection-action" onClick={() => editor.changeHeight(0.4)} aria-label="Stein eine Plattenhöhe höher">↑ Höher</button>
+                  <button type="button" className="selection-action" onClick={() => editor.changeHeight(-0.4)} aria-label="Stein eine Plattenhöhe tiefer">↓ Tiefer</button>
                   <button type="button" className="selection-action" onClick={editor.rotateSelected} data-testid="button-rotate">
                     <RotateCw size={16} /><span>Drehen</span>
                   </button>
