@@ -858,7 +858,7 @@ export function BuilderCanvas({
         const target = start.target.clone();
         target.x -= deltaX * Math.cos(start.theta);
         target.z += deltaX * Math.sin(start.theta);
-        target.y += deltaY;
+        target.y -= deltaY;
         updateCamera(
           start.theta + angleDelta + centerX,
           start.phi,
@@ -899,7 +899,7 @@ export function BuilderCanvas({
         const cameraState = cameraStateRef.current;
         updateCamera(
           cameraState.theta - deltaX * 0.008,
-          cameraState.phi + deltaY * 0.006,
+          cameraState.phi - deltaY * 0.006,
           cameraState.distance,
         );
       }
