@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import geometryManifest from './src/features/formats/geometry-manifest.json';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -57,6 +58,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        additionalManifestEntries: [{
+          url: `${basePath}${geometryManifest.url}`,
+          revision: geometryManifest.sha256,
+        }],
         navigateFallback: `${basePath}index.html`,
         globPatterns: ['**/*.{js,css,html,svg,webmanifest,woff2}', 'licenses/connections/**'],
         // Includes the pinned, compressed offline connection hierarchy chunk.

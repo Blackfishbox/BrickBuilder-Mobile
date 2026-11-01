@@ -12,6 +12,7 @@ import { importIO } from "./io/import";
 import { importInternal, exportInternal } from "./internal/adapter";
 import { getImportPartFailures } from "./import-failures";
 import manifest from "./geometry-manifest.json";
+import { prepareLibraryPart } from "../editor/ldraw-editing";
 
 const encode = (text: string) => new TextEncoder().encode(text);
 const licensed = (body = "3 16 0 0 0 20 0 0 0 20 0") =>
@@ -40,6 +41,50 @@ beforeEach(async () => { await builderDatabase.open(); });
 afterEach(async () => { vi.unstubAllGlobals(); vi.restoreAllMocks(); await builderDatabase.delete(); });
 
 describe("approved recursive acquisition", () => {
+  const inventoryPart = (ldrawId: string) => ({
+    id: `inventory:${ldrawId}`, packageId: "catalog", ldrawId, name: ldrawId,
+    category: "Teileliste", keywords: [], file: `parts/${ldrawId}.dat`,
+  });
+  it("prepares inventory part 3004 and its complete bundled closure again without any network", async () => {
+    vi.stubGlobal("fetch", serve({}));
+    const prepared = await prepareLibraryPart(inventoryPart("3004"));
+    expect(prepared.model.instances[0].part.status).toBe("resolved");
+    const stored = await builderDatabase.geometrySnapshots.toArray();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].files.length).toBeGreaterThan(1);
+    expect(stored[0].files.every(file => file.sha256 && file.byteLength)).toBe(true);
+    const offline = vi.fn().mockRejectedValue(new TypeError("Offline"));
+    vi.stubGlobal("fetch", offline);
+    const restored = await prepareLibraryPart(inventoryPart("3004"));
+    expect(restored.model.instances[0].part.status).toBe("resolved");
+    expect(Object.keys(restored.model.resources).sort()).toEqual(Object.keys(prepared.model.resources).sort());
+    for (const [path, file] of Object.entries(prepared.model.resources)) {
+      expect(restored.model.resources[path].content).toBe(file.content);
+      expect(restored.model.resources[path].sourceUrl).toBe(file.sourceUrl);
+    }
+    expect(offline).not.toHaveBeenCalled();
+  });
+  it("downloads an inventory root and recursive dependencies, then reuses them offline", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", serve({
+      "parts/inventory-download.dat": licensed("1 16 0 0 0 1 0 0 0 1 0 0 0 1 inventory-child.dat"),
+      "p/inventory-child.dat": licensed(),
+    }, calls));
+    const prepared = await prepareLibraryPart(inventoryPart("inventory-download"));
+    expect(prepared.model.resources["p/inventory-child.dat"]).toBeDefined();
+    expect(calls).toContain("parts/inventory-download.dat");
+    expect(calls).toContain("p/inventory-child.dat");
+    const offline = vi.fn().mockRejectedValue(new TypeError("Offline"));
+    vi.stubGlobal("fetch", offline);
+    expect((await prepareLibraryPart(inventoryPart("inventory-download"))).model.instances[0].part.status).toBe("resolved");
+    expect(offline).not.toHaveBeenCalled();
+  });
+  it("retries ordinary inventory download failures on the next explicit selection", async () => {
+    vi.stubGlobal("fetch", serve({ "parts/inventory-retry.dat": 404 }));
+    await expect(prepareLibraryPart(inventoryPart("inventory-retry"))).rejects.toThrow("inventory-retry.dat");
+    vi.stubGlobal("fetch", serve({ "parts/inventory-retry.dat": licensed() }));
+    expect((await prepareLibraryPart(inventoryPart("inventory-retry"))).model.instances[0].part.status).toBe("resolved");
+  });
   it("normalizes without accepting URLs, traversal, encoded paths or arbitrary namespaces", () => {
     expect(normalizeReference(" S\\Test.DAT ")).toBe("s/test.dat");
     expect(candidates("48\\edge.dat")).toEqual(["parts/48/edge.dat", "p/48/edge.dat"]);

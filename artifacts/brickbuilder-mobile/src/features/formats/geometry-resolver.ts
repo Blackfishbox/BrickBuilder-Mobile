@@ -173,7 +173,7 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
   if (Object.values(model.resources).some(f => /!TEXMAP/.test(f.content))) model.issues.push({ code: "textures", message: "LDraw-TEXMAP-Texturen werden nicht dargestellt; Basisflächen bleiben sichtbar." });
   if (options.signal?.aborted) model.issues.push({ code: "geometry-cancelled",
     message: "Nachladen abgebrochen. Geprüfte Teile und Originaldaten bleiben in der Vorschau; fehlende Teile können erneut geladen werden." });
-  if (downloaded.size) {
+  if (downloaded.size || snapshot) {
     // Only complete, compiled root closures enter the reusable cache, in one transaction.
     const valid = new Set<string>();
     const roots = [...new Set(model.instances.filter(i => i.part.status === "resolved").map(i => key(i.reference)))];
@@ -192,11 +192,15 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
       const path = candidates(root).find(path => available[path]);
       if (path) add(path);
     }
-    if ([...valid].some(path => downloaded.has(path))) {
+    if (valid.size && (snapshot || [...valid].some(path => downloaded.has(path)))) {
       const retrieval: RetrievalSnapshot = {
         version: 1, id: crypto.randomUUID(), createdAt: new Date().toISOString(), roots,
         graph: Object.fromEntries([...valid].map(path => [path, graph[path] ?? []])),
-        files: [...valid].map(path => available[path]), legalDocuments: model.legalDocuments,
+        files: await Promise.all([...valid].map(async path => {
+          const file = available[path];
+          const bytes = new TextEncoder().encode(file.content);
+          return { ...file, sha256: await hashBytes(bytes), byteLength: bytes.length };
+        })), legalDocuments: model.legalDocuments,
       };
       model.retrievalSnapshots = [...(model.retrievalSnapshots ?? []), { ...retrieval, files: [] }];
       if (options.signal?.aborted) return;
