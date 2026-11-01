@@ -10,10 +10,15 @@ const legalDocument = z.object({
   retrievedAt: z.string().optional(), retrievalSource: z.string().optional(),
 });
 const color = z.object({
+  catalog: z.object({
+    version: z.string(), status: z.enum(["confirmed", "ambiguous", "unknown"]),
+    rebrickableIds: z.array(z.string()), brickLinkIds: z.array(z.number().int()),
+    sources: z.array(z.string()).optional(),
+  }).optional(),
   ldrawCode: z.string(), name: z.string(), hex: z.string().regex(/^#[0-9a-f]{6}$/i),
   alpha: z.number().min(0).max(255), brickLinkId: z.number().optional(), brickLinkName: z.string().optional(),
   studioId: z.string().optional(), source: z.string(),
-});
+}).passthrough();
 const schema = z.object({
   schemaVersion: z.literal(1), id: z.string().min(1), name: z.string().max(256),
   createdAt: z.string(), updatedAt: z.string(), metadata: z.record(z.string(), z.unknown()),

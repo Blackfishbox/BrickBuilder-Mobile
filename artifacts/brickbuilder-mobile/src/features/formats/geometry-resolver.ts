@@ -10,6 +10,7 @@ import { MAPPING_LEGAL_DOCUMENT, resolvePartMapping } from "../parts/bricklink-e
 import { candidates, dependencies, inspectFile, normalizeReference } from "@workspace/ldraw-source";
 import { findOnline, hashBytes, OnlineGeometry, type ResolveOptions } from "./online-geometry";
 import type { RetrievalSnapshot } from "./types";
+import { ensureCatalog, catalogManifest, getCatalogState } from "../catalog/client";
 
 interface Snapshot {
   files: LibraryFile[];
@@ -17,6 +18,7 @@ interface Snapshot {
   legalDocuments: PackagePayload["legalDocuments"];
 }
 export async function resolveGeometry(model: ImportedModel, options: ResolveOptions = {}): Promise<void> {
+  if (typeof Worker !== "undefined") await ensureCatalog().catch(() => undefined);
   const managedIssues = new Set(["geometry-download", "missing-part", "geometry-invalid", "geometry-color",
     "missing-color", "missing-bl-color", "missing-bl-part", "ambiguous-bl-part", "textures", "geometry-cache", "geometry-cancelled"]);
   model.issues = model.issues.filter(issue => !managedIssues.has(issue.code));
@@ -117,7 +119,7 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
     const matching = model.instances.filter(i => key(i.reference) === reference);
     const entry = parts.find(p => `${p.ldrawId.toLowerCase()}.dat` === reference);
     const snapPart = snapshot?.parts.find(p => p.file === `parts/${reference}`);
-    const mapping = resolvePartMapping(reference, parts);
+    const mapping = resolvePartMapping(reference, parts, matching.flatMap(instance => instance.part.mapping?.candidates ?? []));
     const confirmed = mapping.status === "confirmed" ? mapping.candidates[0] : undefined;
     for (const instance of matching) {
       instance.part = {
@@ -162,6 +164,10 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
     .filter((doc, index, all) => all.findIndex(d =>
       d.name === doc.name && d.sourceUrl === doc.sourceUrl && d.content === doc.content) === index);
   refreshModelColors(model);
+  if (getCatalogState().status === "ready" && !model.legalDocuments.some(document => document.name === `Rebrickable catalog ${catalogManifest.version}`)) {
+    model.legalDocuments.push({ name: `Rebrickable catalog ${catalogManifest.version}`, sourceUrl: catalogManifest.termsUrl,
+      content: `${catalogManifest.attribution}\nSnapshot SHA-256: ${catalogManifest.sha256}\n${JSON.stringify(catalogManifest.sources, null, 2)}` });
+  }
   const unmapped = new Set(model.instances.filter(i => !i.part.brickLinkId).map(i => i.reference)).size;
   if (unmapped) model.issues.push({ code: "missing-bl-part", count: unmapped, message: `Für ${unmapped} Teilearten fehlt unserer App noch eine bestätigte BrickLink-Katalogzuordnung. Das bedeutet nicht, dass diese LEGO-Teile ungültig sind oder ihre LDraw-Geometrie fehlt. LDraw- und BrickLink-Teilenummern bleiben getrennt.` });
   if (Object.values(model.resources).some(f => /!TEXMAP/.test(f.content))) model.issues.push({ code: "textures", message: "LDraw-TEXMAP-Texturen werden nicht dargestellt; Basisflächen bleiben sichtbar." });

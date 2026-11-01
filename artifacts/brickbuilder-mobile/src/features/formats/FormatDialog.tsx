@@ -5,6 +5,7 @@ import type { ImportedModel } from './types';
 import { exportModel, importModelFile, validateImportFile } from './adapters';
 import ImportPartNotification from './ImportPartNotification';
 import { importDiagnostics } from './import-diagnostics';
+import CatalogPanel from '../catalog/CatalogPanel';
 import { resolveGeometry } from './geometry-resolver';
 import type { GeometryProgress } from './online-geometry';
 import './format-dialog.css';
@@ -41,6 +42,7 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
   }
   return (
     <div className="fmt-report" data-testid="format-report">
+      <CatalogPanel />
       <div className="fmt-source"><strong>{model.sourceName}</strong><span>{String(model.format).toUpperCase()}</span></div>
       <div className="fmt-stats">
         <div><b>{bricks + model.instances.length}</b><small>Ergebnis gesamt</small></div>
@@ -79,12 +81,13 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
       )}
       <details className="fmt-details">
         <summary>Zuordnungen ({groups.size} Teil-/Farbkombinationen) <ChevronDown size={14} /></summary>
-        <p className="fmt-muted">BrickLink-Nachweise stammen aus ausdrücklich genannten LDraw-Schlüsselwörtern, nicht aus Studio. Studio-IDs bleiben ohne gesonderten Beleg leer.</p>
+        <p className="fmt-muted">BrickLink-Nachweise stammen aus expliziten LDraw-Schlüsselwörtern und dem geprüften vollständigen Rebrickable-Download. Import-/Exportrichtung, getrennte Namensräume und ältere Belege bleiben erhalten. Studio-IDs werden nicht geraten.</p>
         <ul>{[...groups.values()].map(({ instance: i, count }) => (
           <li key={i.id} className="fmt-map">
             <i style={{ background: i.color?.hex ?? '#ccc' }} />
             <span><b>{i.part.name ?? i.reference} · {count}×</b>
               <small>LDraw {i.part.ldrawId} · BrickLink {i.part.brickLinkId ?? '—'} · Studio {i.part.studioId ?? '—'}</small>
+              <small>Rebrickable {i.part.mapping?.rebrickableIds?.join(', ') || '—'} · Katalogstand {i.part.mapping?.catalogVersion ?? 'gespeicherte Einzelnachweise'}</small>
               <small>Teilezuordnung: {i.part.mapping?.status === 'confirmed' ? 'belegt' : i.part.mapping?.status === 'ambiguous' ? 'mehrdeutig – keine Auswahl' : 'unbestätigt – keine Nummernableitung'}</small>
               {i.part.mapping?.candidates.map((e, n) => (
                 <small key={n}>
@@ -97,6 +100,7 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
               ))}
               <small>Farbe {i.color?.name ?? `Code ${i.colorCode}`} · LDraw {i.color?.ldrawCode ?? i.colorCode} · BrickLink {i.color?.brickLinkName ?? '—'} {i.color?.brickLinkId ?? '—'} · Studio {i.color?.studioId ?? '—'}</small>
               {i.color && <small>Zuordnungsquelle: {i.color.source}</small>}
+              {i.color?.catalog && <small>Rebrickable-Farben {i.color.catalog.rebrickableIds.join(', ')} · {i.color.catalog.status === 'ambiguous' ? `mehrdeutig: BrickLink ${i.color.catalog.brickLinkIds.join(', ')}` : i.color.catalog.status === 'confirmed' ? 'eindeutig belegt' : 'keine BrickLink-Zielnummer'}</small>}
             </span>
             <em className={`fmt-status s-${i.part.status}`}>{i.part.status === 'resolved' ? 'Geometrie geladen' : 'Fehlt'}</em>
           </li>

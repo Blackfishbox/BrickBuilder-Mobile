@@ -8,12 +8,15 @@ export interface PartMappingEvidence {
   sourceLine: string;
   sourceSha256: string;
   author: string;
-  license: "CC-BY-4.0" | "CC0-1.0";
+  license: "CC-BY-4.0" | "CC0-1.0" | "Rebrickable-Attribution";
+  rebrickableId?: string;
   mappingSet: string;
   version: string;
 }
 
 export interface PartMappingResult {
+  rebrickableIds?: string[];
+  catalogVersion?: string;
   status: "confirmed" | "ambiguous" | "unknown";
   candidates: PartMappingEvidence[];
 }

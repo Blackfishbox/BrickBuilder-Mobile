@@ -99,9 +99,10 @@ describe("offline LDraw import colors", () => {
     ];
     const document = normalizeDocument({ id: "old-project", name: "Saved", imported: model });
     expect(document.imported!.instances[0].color?.hex).toBe("#FAC80A");
-    expect(model.issues.filter(issue => issue.code === "missing-color").map(issue => issue.reference)).toEqual(["1009007"]);
-    expect(model.issues.some(issue => issue.code === "geometry-color")).toBe(false);
-    expect(model.issues.some(issue => issue.code === "missing-part")).toBe(true);
+    expect(document.imported!.issues.filter(issue => issue.code === "missing-color").map(issue => issue.reference)).toEqual(["1009007"]);
+    expect(document.imported!.issues.some(issue => issue.code === "geometry-color")).toBe(false);
+    expect(document.imported!.issues.some(issue => issue.code === "missing-part")).toBe(true);
+    expect(model.instances[0].color?.name).toBe("Wrong cache");
     const reopened = importInternal(exportInternal(document));
     expect(reopened.imported!.instances[0].color?.hex).toBe("#FAC80A");
     expect(JSON.stringify([model.sourceText, model.originalBytes, model.instances.map(i => [i.colorCode, i.matrix])])).toBe(source);

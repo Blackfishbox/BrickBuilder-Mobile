@@ -1,5 +1,32 @@
 # Setup and hosting
 
+## Complete catalog snapshot
+
+The full mapping catalog needs an initial download, then uses IndexedDB offline.
+The API serves only the pinned public object at the exact path in
+`artifacts/brickbuilder-mobile/src/features/catalog/manifest.json`. Existing
+App Storage service identity is used; no Rebrickable API key or paid catalog
+subscription is needed. Start the existing API alongside the frontend, or serve
+the approved bytes statically at that path.
+
+For independent static hosting, first reproduce/obtain the approved snapshot
+as described in the [catalog guide](../artifacts/brickbuilder-mobile/docs/complete-catalog.md).
+After a frontend build, copy it under the **frontend base path**, for example:
+
+```sh
+mkdir -p artifacts/brickbuilder-mobile/dist/public/api/catalog/snapshot
+cp generated-artifacts/catalog-sources/catalog.bin \
+  artifacts/brickbuilder-mobile/dist/public/api/catalog/snapshot/ad5363fcd70e3d278cb26c69bb0af5291c89628ca84e6e674fccaa8ea6f5475c
+```
+
+Use the descriptor's actual digest when updating, serve `application/octet-stream`,
+and do not add `Content-Encoding: gzip` or rewrite this binary route to index.html.
+For a subpath installation, retain the catalog URL below that subpath or proxy it
+to the matching API route. Do not deploy generated source downloads or private IO
+fixtures. A missing/corrupt snapshot is visibly reported, not silently substituted
+with fabricated catalog data. The old verified subset can still support the
+editor, but cannot be described as full coverage.
+
 ## Scope and tested toolchain
 
 The editor can run as a standalone static browser application. An optional

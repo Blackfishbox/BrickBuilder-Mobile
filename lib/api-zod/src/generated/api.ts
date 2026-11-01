@@ -9,6 +9,19 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read the pinned complete public catalog mapping snapshot
+ */
+export const getMappingCatalogSnapshotPathSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const GetMappingCatalogSnapshotParams = zod.object({
+  "sha256": zod.coerce.string().regex(getMappingCatalogSnapshotPathSha256RegExp)
+})
+
+export const GetMappingCatalogSnapshotResponse = zod.unknown()
+
+
+/**
  * Fixed official source only. Exact source bytes, without HTTP content encoding. Optional operator-approved archive takes precedence.
  * @summary Read an approved original LDraw file
  */

@@ -11,6 +11,30 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /catalog/snapshot/{sha256}:
+    get:
+      operationId: getMappingCatalogSnapshot
+      tags: [catalog]
+      summary: Read the pinned complete public catalog mapping snapshot
+      parameters:
+        - in: path
+          name: sha256
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+      responses:
+        "200":
+          description: Gzip-compressed catalog bytes, without HTTP Content-Encoding
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Snapshot not approved
+        "503":
+          description: Approved snapshot unavailable
   /ldraw/file:
     get:
       operationId: getLDrawFile

@@ -3,7 +3,9 @@
 A local-first, installable 3D brick-building PWA with a **German application
 interface**. Build with verified LDraw geometry, save projects in your browser,
 install reviewed LDraw parts packages, and import IO, LDR, MPD or internal JSON
-models. No account, paid service or application API is required for the frontend.
+models. No account or paid external catalog API is required. The complete
+mapping catalog needs one successful download from the supplied resolver or a
+static snapshot URL; it then remains available locally.
 
 Import support is bounded, not a claim of general BrickLink Studio compatibility.
 Imported parts can be selected individually, moved, rotated, recolored and
@@ -13,6 +15,8 @@ See the [editing guide](artifacts/brickbuilder-mobile/docs/editing.md) for workf
 and the explicit limitations of edited MPD/IO export.
 See the [application documentation](artifacts/brickbuilder-mobile/README.md)
 for supported formats, verification history and limitations.
+The [complete catalog guide](artifacts/brickbuilder-mobile/docs/complete-catalog.md)
+documents all published source rows, directional mappings, coverage and offline use.
 
 ## Quick start
 
@@ -55,7 +59,7 @@ optional API services and troubleshooting.
 - `artifacts/brickbuilder-mobile/` — React, TypeScript, Vite, Three.js, Dexie and PWA.
 - `artifacts/brickbuilder-mobile/docs/` — architecture, import evidence and licensing.
 - [Large-model performance](artifacts/brickbuilder-mobile/docs/performance.md) — rendering budgets, reference measurements and device-testing limits.
-- `artifacts/api-server/` — optional same-origin LDraw resolver; no database or API key required.
+- `artifacts/api-server/` — same-origin LDraw and pinned catalog resolver; no database or external API key required.
 - `lib/` — workspace libraries, API contracts and optional database support.
 - `scripts/` — maintenance and sanitized GitHub backup utilities.
 - `artifacts/mockup-sandbox/` — separate development preview; not needed to host the app.

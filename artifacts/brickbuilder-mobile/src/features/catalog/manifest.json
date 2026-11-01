@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "version": "2026-11-01.1",
+  "sha256": "ad5363fcd70e3d278cb26c69bb0af5291c89628ca84e6e674fccaa8ea6f5475c",
+  "bytes": 2180181,
+  "url": "api/catalog/snapshot/ad5363fcd70e3d278cb26c69bb0af5291c89628ca84e6e674fccaa8ea6f5475c",
+  "sources": {
+    "parts": {
+      "url": "https://cdn.rebrickable.com/media/downloads/parts.csv.gz",
+      "sha256": "78eb0c23a339f3fd8dbdd146963c7d6f5aa26ced8d458be2845a0c3cc4653e44",
+      "decodedSha256": "28f469cebfc42cb812b64de813d08bfbb8d66e86fe96eeb7739a5cbde0d73912",
+      "bytes": 1059512,
+      "rows": 64914,
+      "columns": [
+        "part_num",
+        "name",
+        "part_cat_id",
+        "part_material"
+      ]
+    },
+    "colors": {
+      "url": "https://cdn.rebrickable.com/media/downloads/colors.csv.gz",
+      "sha256": "5c36e8c80bca56efa17c792c4dfd7086ee3185c1e7f399569b149c2b6137bb32",
+      "decodedSha256": "dee409ab224a1f9e09ce961fc62bbf437013ef8db34064c6d47cb1745cc971b7",
+      "bytes": 4890,
+      "rows": 275,
+      "columns": [
+        "id",
+        "name",
+        "rgb",
+        "is_trans",
+        "num_parts",
+        "num_sets",
+        "y1",
+        "y2"
+      ]
+    },
+    "part_mappings": {
+      "url": "https://cdn.rebrickable.com/media/downloads/part_mappings.csv.gz",
+      "sha256": "5f19f7cfaf24a68785ffcd2fe26ae71acf6a01d3ce8a98abb96af4b8b5298567",
+      "decodedSha256": "fe8f3e8c391c905ce88cde2acffcbdb18d9ec4756711aa4efb36900ca4d5e223",
+      "bytes": 1434837,
+      "rows": 183263,
+      "columns": [
+        "part_num",
+        "ext_system",
+        "ext_id",
+        "is_export_id",
+        "is_import_id"
+      ]
+    },
+    "color_mappings": {
+      "url": "https://cdn.rebrickable.com/media/downloads/color_mappings.csv.gz",
+      "sha256": "6411b969bb07d31c32f44ba991046c13efc8672d89087d1687c3f5e5c56572cc",
+      "decodedSha256": "d67da183c57811768343b1cba40d981123e974a8797748bdaf9c6adc022d3f32",
+      "bytes": 8007,
+      "rows": 846,
+      "columns": [
+        "id",
+        "ext_system",
+        "ext_id",
+        "ext_descr",
+        "is_export_id",
+        "is_import_id"
+      ]
+    }
+  },
+  "attribution": "Catalog data sourced from Rebrickable (https://rebrickable.com/downloads/). Public catalog CSV downloads; permitted use under https://rebrickable.com/terms/ sections 5.1 and 5.3, reviewed 2026-11-01. No MOC data, images or Studio resources. Not a CC BY geometry license. No endorsement by Rebrickable, LEGO or BrickLink.",
+  "termsUrl": "https://rebrickable.com/terms/",
+  "object": "catalog/approved/ad5363fcd70e3d278cb26c69bb0af5291c89628ca84e6e674fccaa8ea6f5475c/catalog.bin"
+}

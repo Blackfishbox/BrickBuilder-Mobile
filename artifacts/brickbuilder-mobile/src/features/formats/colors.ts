@@ -1,5 +1,7 @@
 import type { ResolvedColor } from "./types";
 import { LDRAW_COLOR_ROWS, LDRAW_COLOR_SNAPSHOT } from "./ldraw-palette";
+import catalogManifest from "../catalog/manifest.json";
+import { getCatalogState } from "../catalog/state";
 
 // Explicit reviewed subset; numbers from the two namespaces must never be equated.
 // LDraw values: official LDConfig.ldr; BL names/IDs: BrickLink color guide.
@@ -30,8 +32,30 @@ export const COLORS: ResolvedColor[] = LDRAW_COLOR_ROWS.map(([code, name, hex, a
 });
 const byCode = new Map(COLORS.map(color => [color.ldrawCode, color]));
 export function resolveColor(code: string): ResolvedColor | undefined {
+  if (code === "16" || code === "24") return undefined;
   const mapped = byCode.get(code);
+  const colorIndex = getCatalogState().index?.colors;
+  const records = colorIndex && Object.hasOwn(colorIndex, code) ? colorIndex[code] : undefined;
+  if (records?.length) {
+    const ids = new Set(records.flatMap(record => record.bl.map(bl => Number(bl.id))));
+    if (mapped?.brickLinkId !== undefined) ids.add(mapped.brickLinkId);
+    const confirmed = ids.size === 1 ? [...ids][0] : undefined;
+    const selected = records.flatMap(record => record.bl).find(bl => Number(bl.id) === confirmed);
+    return {
+      ...(mapped ?? { ldrawCode: code, name: records[0].name, hex: records[0].hex, alpha: records[0].transparent ? 128 : 255 }),
+      brickLinkId: confirmed, brickLinkName: confirmed === undefined ? undefined : selected?.name ?? mapped?.brickLinkName,
+      catalog: { version: catalogManifest.version, rebrickableIds: records.map(record => record.rb),
+        brickLinkIds: [...ids], status: ids.size === 1 ? "confirmed" : ids.size > 1 ? "ambiguous" : "unknown" },
+      source: `${mapped?.source ?? "Rebrickable RGB; transparency approximated from is_trans"}; ${catalogManifest.sources.color_mappings.url}; SHA-256 ${catalogManifest.sources.color_mappings.sha256}; ${catalogManifest.version}`,
+    };
+  }
   if (mapped) return { ...mapped };
   if (/^0x2[0-9a-f]{6}$/i.test(code)) return { ldrawCode: code, name: "LDraw Direct Color", hex: "#" + code.slice(3), alpha: 255, source: "LDraw direct colour syntax; no BrickLink mapping" };
   return undefined;
+}
+export function catalogPalette(): ResolvedColor[] {
+  const codes = new Set([...byCode.keys(), ...Object.keys(getCatalogState().index?.colors ?? {})]);
+  return [...codes].filter(code => /^\d+$/.test(code)).flatMap(code => {
+    const color = resolveColor(code); return color ? [color] : [];
+  });
 }

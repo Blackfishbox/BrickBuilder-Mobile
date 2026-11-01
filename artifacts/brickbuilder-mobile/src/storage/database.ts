@@ -31,6 +31,7 @@ class BuilderDatabase extends Dexie {
   libraryParts!: Table<LibraryPart, string>;
   libraryFiles!: Table<StoredLibraryFile, string>;
   geometrySnapshots!: Table<RetrievalSnapshot, string>;
+  catalogSnapshots!: Table<{ id: string; bytes: Uint8Array }, string>;
 
   constructor() {
     super("brickbuilder-mobile");
@@ -46,6 +47,7 @@ class BuilderDatabase extends Dexie {
       libraryFiles: "id, packageId",
     });
     this.version(3).stores({ geometrySnapshots: "id, createdAt" });
+    this.version(4).stores({ catalogSnapshots: "id" });
   }
 }
 

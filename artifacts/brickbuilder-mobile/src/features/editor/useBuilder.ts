@@ -14,6 +14,8 @@ import {
 } from "./model";
 import { commit, createHistory, redo, undo, type HistoryState } from "./history";
 import type { LibraryPart } from "../parts/types";
+import { ensureCatalog, useCatalog } from "../catalog/client";
+import { refreshedCatalogModel } from "../catalog/refresh-model";
 import { resolveColor } from "../formats/colors";
 import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
 import {
@@ -37,6 +39,7 @@ interface AnalysisResponse extends ModelAnalysis {
 }
 
 export function useBuilder() {
+  const catalog = useCatalog();
   const [history, setHistory] = useState<HistoryState>(() =>
     createHistory(createEmptyDocument()),
   );
@@ -51,6 +54,15 @@ export function useBuilder() {
   useEffect(() => () => partControllerRef.current?.abort(), []);
   const [toolMode, setToolMode] = useState<ToolMode>("build");
   const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    if (!isReady || catalog.status !== "ready" || !historyRef.current.document.imported) return;
+    const cache = new WeakMap();
+    const apply = (document: BuilderDocument) => document.imported
+      ? { ...document, imported: refreshedCatalogModel(document.imported, cache) } : document;
+    const current = historyRef.current;
+    const next = { document: apply(current.document), past: current.past.map(apply), future: current.future.map(apply) };
+    historyRef.current = next; documentRef.current = next.document; setHistory(next);
+  }, [isReady, catalog.status]);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -89,9 +101,11 @@ export function useBuilder() {
   const restoreLastProject = useCallback(async (): Promise<boolean> => {
     let restored = false;
     try {
+      const catalogReady = ensureCatalog().catch(() => undefined);
       const stored = await loadCurrentProject();
+      if (stored?.imported) await catalogReady;
       if (stored) {
-        replaceDocument(stored, true);
+        replaceDocument(stored.imported ? { ...stored, imported: refreshedCatalogModel(stored.imported) } : stored, true);
         if (stored.imported) setToolMode("select");
         setSavedAt(stored.updatedAt);
         restored = true;
@@ -375,8 +389,9 @@ export function useBuilder() {
     async (id: string) => {
       const project = await loadProject(id);
       if (!project) return false;
-      await saveProject(project);
-      replaceDocument(project, true);
+      const refreshed = project.imported ? { ...project, imported: refreshedCatalogModel(project.imported) } : project;
+      await saveProject(refreshed);
+      replaceDocument(refreshed, true);
       setSavedAt(project.updatedAt);
       setSelectedId(null);
       setToolMode(project.imported ? "select" : "build");

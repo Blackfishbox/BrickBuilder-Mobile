@@ -3,6 +3,7 @@ import { AlertTriangle, Check, CloudOff, Download, ExternalLink, LoaderCircle, P
 import { PART_PACKAGES, installPackage, listInstalledPackages, searchLocalParts } from './library';
 import type { InstalledPackage, LibraryPart } from './types';
 import './parts-library.css';
+import CatalogPanel from "../catalog/CatalogPanel";
 
 type PkgState = { status: 'idle' | 'pending' | 'error'; error?: string };
 type Category = '' | 'Steine' | 'Platten';
@@ -105,6 +106,7 @@ export default function PartsLibrary({ online, selectedPartId, loading = false, 
         )}
       </div>
 
+      <CatalogPanel />
       {installedError && (
         <div className="plib-alert" role="alert">
           <AlertTriangle size={14} /><span>{installedError}</span>

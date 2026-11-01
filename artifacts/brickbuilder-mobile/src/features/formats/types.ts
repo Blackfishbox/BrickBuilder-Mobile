@@ -4,6 +4,7 @@ import type { LibraryFile, PackagePayload, PartMappingResult } from "../parts/ty
 export type Affine = [number, number, number, number, number, number, number, number, number, number, number, number];
 export interface ImportIssue { code: string; message: string; reference?: string; count?: number }
 export interface ResolvedColor {
+  catalog?: { version: string; status: "confirmed" | "ambiguous" | "unknown"; rebrickableIds: string[]; brickLinkIds: number[]; sources?: string[] };
   ldrawCode: string;
   name: string;
   hex: string;

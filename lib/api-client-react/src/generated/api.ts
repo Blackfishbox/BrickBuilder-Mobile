@@ -47,6 +47,83 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getGetMappingCatalogSnapshotUrl = (sha256: string,) => {
+
+
+
+
+  return `/api/catalog/snapshot/${sha256}`
+}
+
+/**
+ * @summary Read the pinned complete public catalog mapping snapshot
+ */
+export const getMappingCatalogSnapshot = async (sha256: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetMappingCatalogSnapshotUrl(sha256),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMappingCatalogSnapshotQueryKey = (sha256: string,) => {
+    return [
+    `/api/catalog/snapshot/${sha256}`
+    ] as const;
+    }
+
+
+export const getGetMappingCatalogSnapshotQueryOptions = <TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(sha256: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMappingCatalogSnapshotQueryKey(sha256);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>> = ({ signal }) => getMappingCatalogSnapshot(sha256, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sha256 !== null && sha256 !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMappingCatalogSnapshotQueryResult = NonNullable<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>>
+export type GetMappingCatalogSnapshotQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the pinned complete public catalog mapping snapshot
+ */
+
+export function useGetMappingCatalogSnapshot<TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(
+ sha256: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMappingCatalogSnapshotQueryOptions(sha256,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetLDrawFileUrl = (params: GetLDrawFileParams,) => {
   const normalizedParams = new URLSearchParams();
 

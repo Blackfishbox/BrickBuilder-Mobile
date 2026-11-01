@@ -1,4 +1,6 @@
 import type { LibraryPart, PartMappingEvidence, PartMappingResult } from "./types";
+import catalogManifest from "../catalog/manifest.json";
+import { getCatalogState } from "../catalog/state";
 
 /**
  * Derived from explicit !KEYWORDS only. CC BY 4.0, independently of app code.
@@ -59,13 +61,32 @@ export const MAPPING_LEGAL_DOCUMENT = {
   ].join("\n\n"),
 };
 
-export function resolvePartMapping(reference: string, local: LibraryPart[] = []): PartMappingResult {
+export function resolvePartMapping(reference: string, local: LibraryPart[] = [], prior: PartMappingEvidence[] = []): PartMappingResult {
   // Case and file extension only: never strip suffixes, paths or print codes.
   const id = reference.toLowerCase().replace(/\.dat$/, "");
-  const candidates = [...BRICKLINK_EVIDENCE, ...local.flatMap(p =>
+  const seen = new Set<string>();
+  const index = getCatalogState().index?.parts;
+  const entries = index && Object.hasOwn(index, id) ? index[id] : [];
+  const complete: PartMappingEvidence[] = entries.flatMap(record => record.bl.map(brickLinkId => ({
+    ldrawId: id, brickLinkId, rebrickableId: record.rb, name: record.name,
+    variant: "Explicit LD import → Rebrickable → BL export mapping; exact reference only",
+    sourceUrl: catalogManifest.sources.part_mappings.url,
+    sourceLine: `part_mappings.csv: ${record.rb},LD,${id},*,True → ${record.rb},BL,${brickLinkId},True,*`,
+    sourceSha256: catalogManifest.sources.part_mappings.sha256,
+    author: "Rebrickable community", license: "Rebrickable-Attribution",
+    mappingSet: "rebrickable-complete-catalog", version: catalogManifest.version,
+  })));
+  const candidates = [...BRICKLINK_EVIDENCE, ...complete, ...prior, ...local.flatMap(p =>
     p.ldrawId.toLowerCase() === id ? p.mappings ?? [] : [])]
     .filter(e => e.ldrawId.toLowerCase() === id)
-    .filter((e, index, all) => all.findIndex(other => JSON.stringify(other) === JSON.stringify(e)) === index);
+    .filter(e => {
+      // JSON project validation can reorder object keys without changing evidence.
+      const signature = JSON.stringify(Object.entries(e).filter(([, value]) => value !== undefined).sort(([a], [b]) => a.localeCompare(b)));
+      if (seen.has(signature)) return false;
+      seen.add(signature); return true;
+    });
   const ids = new Set(candidates.map(e => e.brickLinkId));
-  return { status: ids.size === 0 ? "unknown" : ids.size === 1 ? "confirmed" : "ambiguous", candidates };
+  return { status: ids.size === 0 ? "unknown" : ids.size === 1 ? "confirmed" : "ambiguous", candidates,
+    ...(getCatalogState().index ? { catalogVersion: catalogManifest.version,
+      rebrickableIds: entries.map(record => record.rb) } : {}) };
 }

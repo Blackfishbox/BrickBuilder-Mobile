@@ -10,6 +10,10 @@ For installation, tested tool versions, required variables and deployment,
 see the [root README](../../README.md) and
 [setup and hosting guide](../../docs/setup-and-hosting.md).
 
+The [complete published mapping catalog](docs/complete-catalog.md) adds all
+64,914 source parts, 275 colors, 183,263 part mappings and 846 color mappings
+with offline worker processing, directional evidence and explicit unknowns.
+
 ## Available foundation
 
 - Responsive portrait/landscape UI with touch toolbar, brick selection,

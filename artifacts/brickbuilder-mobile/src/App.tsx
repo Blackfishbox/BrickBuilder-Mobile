@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
-import { COLORS as LDRAW_COLORS } from '@/features/formats/colors';
+import { catalogPalette } from '@/features/formats/colors';
+import { useCatalog } from '@/features/catalog/client';
 import { importDiagnostics } from '@/features/formats/import-diagnostics';
 import { useBuilder } from '@/features/editor/useBuilder';
 import {
@@ -46,10 +47,11 @@ const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   studs: definition.studsX * definition.studsZ,
 }));
 
-const COLORS = LDRAW_COLORS.map(color => ({ name: color.name, value: color.hex, ldrawCode: color.ldrawCode }));
 const BuilderCanvas = lazy(() => import('@/features/engine/BuilderCanvas'));
 
 function App() {
+  const catalog = useCatalog();
+  const COLORS = catalogPalette().map(color => ({ name: color.name, value: color.hex, ldrawCode: color.ldrawCode }));
   const editor = useBuilder();
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [partsOpen, setPartsOpen] = useState(false);
@@ -263,6 +265,7 @@ function App() {
                 onMove={editor.move}
               />
             </Suspense>
+            {catalog.status === "error" && <div role="status" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm">Vollständiger Zuordnungskatalog nicht verfügbar. Vorhandene Nachweise bleiben erhalten. <button type="button" onClick={() => setPartsOpen(true)}>Katalog unter „Steine“ erneut laden</button></div>}
             {editor.partError && !partsOpen && <p role="alert" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm" data-testid="status-part-error">{editor.partError}</p>}
             {editor.imported && (
               <button type="button" className="import-report-button" onClick={() => setFormatsOpen(true)} data-testid="button-import-report">
