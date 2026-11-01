@@ -85,15 +85,19 @@ Getrennte Adapter:
 | Internes JSON v1 | Strukturvalidierung; bestehende v1-Projekte bleiben gültig | Vollständige lokale Sicherung einschließlich Importdaten; Roundtrip getestet |
 | LDR | Typ-1-Referenzen, volle Matrizen; fehlende Ressourcen als Hinweise | Aufgelöstes flaches Modell; Matrizen/Farben der echten Referenz im Roundtrip getestet |
 | MPD | FILE-Untermodelle, Namen mit Leerzeichen, Farbvererbung | Unveränderte Quelle bei reinem Importmodell; sonst flacher main.ldr-Abschnitt |
-| IO | Unverschlüsseltes ZIP32 mit UTF-8/ASCII-Dateinamen und model.ldr | Minimaler neuer ZIP-Container mit model.ldr und .info; nur im eigenen Importer getestet, keine Studio-Exportkompatibilität behauptet |
+| IO | Unverschlüsseltes ZIP32 und ältere Studio-ZIP32-Verschlüsselung mit dokumentiertem Standardschlüssel; gezieltes Lesen von model.ldr | Minimaler neuer ZIP-Container mit model.ldr und .info; nur im eigenen Importer getestet, keine Studio-Exportkompatibilität behauptet |
 
-Containergrenzen: maximal 32 MiB Upload/entpackte Summe, 16 MiB je ZIP-Eintrag,
+Containergrenzen: maximal 32 MiB Upload/angegebene entpackte Summe, 16 MiB je tatsächlich gelesenem ZIP-Eintrag,
 128 Archiveinträge, 1.024 Untermodelle, 48 Hierarchieebenen, 10.000 Instanzen.
-Mehrteilige, verschlüsselte und ZIP64-Archive werden abgelehnt. CRC, Größen und
-Pfadgrenzen werden vor/nach dem Entpacken geprüft; keine Dateisystemextraktion.
+Mehrteilige, AES-/anders verschlüsselte und ZIP64-Archive werden abgelehnt.
+ZIP-Struktur und Pfadgrenzen werden für alle Einträge geprüft; Größen und CRC
+der tatsächlich gelesenen Inhalte nach dem Entpacken. Zusätzliche IO-Ressourcen
+werden nicht entpackt, sondern im Originalarchiv erhalten. Keine Dateisystemextraktion.
 Geometriedetails, Grenzen und Quellenprüfung:
 [`docs/io-reference-analysis.md`](docs/io-reference-analysis.md) und
 [`docs/import-geometry-licensing.md`](docs/import-geometry-licensing.md).
+Die zweite, verschlüsselte IO-Referenz und ihre verbleibenden Grenzen:
+[`docs/legacy-io-reference.md`](docs/legacy-io-reference.md).
 
 ## Noch nicht enthalten
 
