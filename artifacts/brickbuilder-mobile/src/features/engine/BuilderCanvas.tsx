@@ -1045,7 +1045,12 @@ export function BuilderCanvas({
         const position = drag.destination;
         if (drag.matrix) {
           const matrix = [...(drag.connection?.matrix ?? drag.matrix)] as Affine;
-          matrix[3] = position.x * 20; matrix[7] = -(position.y - importedOffsetRef.current) * 20; matrix[11] = position.z * 20;
+          // Connection matrices are already in original LDU coordinates.
+          // A scene-unit/floor-offset round trip changes exact off-grid values
+          // and must not make the visible preview differ from the transaction.
+          if (!drag.connection) {
+            matrix[3] = position.x * 20; matrix[7] = -(position.y - importedOffsetRef.current) * 20; matrix[11] = position.z * 20;
+          }
           if (importedRootRef.current) instanceIndex(importedRootRef.current)?.preview(drag.id, matrix);
           if (softwareSceneRef.current) previewSoftware(softwareSceneRef.current, drag.id, matrix);
           updateImportedSelection();

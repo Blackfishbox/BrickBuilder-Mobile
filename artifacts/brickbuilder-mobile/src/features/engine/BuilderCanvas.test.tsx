@@ -5,9 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PerspectiveCamera, Vector3 } from "three";
 import { engineFixture } from "./engine-fixtures";
 import type { SoftwareScene } from "./software-scene";
+import * as softwareRendering from "./software-scene";
 import BuilderCanvas from "./BuilderCanvas";
 import * as snapping from "../connections/engine";
 import type { Contact } from "../connections/types";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { gunzipSync } from "fflate";
+import { parseLDraw } from "../formats/ldraw/parser";
+import type { ImportedModel } from "../formats/types";
+import { createEmptyDocument } from "../editor/model";
+import { moveImported } from "../editor/ldraw-editing";
 
 const observed = vi.hoisted(() => ({ scene: undefined as SoftwareScene | undefined, preparations: 0 }));
 vi.mock("./software-scene", async importOriginal => {
@@ -49,6 +57,19 @@ function pickPoint(): { x: number; y: number } {
   const point = new Vector3(0.25, -0.25 + offset, 0).project(camera);
   return { x: (point.x + 1) * 300, y: (1 - point.y) * 300 };
 }
+function catalogProjection() {
+  const bounds = observed.scene!.bounds.clone(), offset = Math.max(0, -bounds.min.y);
+  bounds.translate(new Vector3(0, offset, 0));
+  const target = bounds.getCenter(new Vector3()), radius = bounds.getSize(new Vector3()).length() / 2;
+  const camera = new PerspectiveCamera(42, 1, 0.1, 4000), phi = 0.93, theta = 0.72;
+  const distance = Math.max(8, radius / Math.sin(camera.fov * Math.PI / 360) * 1.08);
+  camera.position.set(target.x + distance * Math.sin(phi) * Math.sin(theta), target.y + distance * Math.cos(phi), target.z + distance * Math.sin(phi) * Math.cos(theta));
+  camera.lookAt(target); camera.updateMatrixWorld(true);
+  return (x: number, y: number, z: number) => {
+    const p = new Vector3(x, y + offset, z).project(camera);
+    return { x: (p.x + 1) * 300, y: (1 - p.y) * 300 };
+  };
+}
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   frames = new Map(); nextFrame = 0; observed.scene = undefined; observed.preparations = 0;
@@ -65,6 +86,42 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); element.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("frame-coalesced drag transactions", () => {
+  it("drags real catalog plate geometry onto both rows with live contacts and identical committed rendering", async () => {
+    const snapshot = JSON.parse(new TextDecoder().decode(gunzipSync(readFileSync(resolve("public/parts/import-geometry-2026-10-31.bin")))));
+    const sourceText = "1 4 0 -8 0 1 0 0 0 1 0 0 0 1 3795.dat\n1 7 80 -8 0 1 0 0 0 1 0 0 0 1 3023b.dat";
+    const model: ImportedModel = { version: 1, format: "ldr", sourceName: "catalog.ldr", sourceText,
+      originalBytes: [...new TextEncoder().encode(sourceText)], ...parseLDraw(sourceText),
+      resources: Object.fromEntries(snapshot.files.map((f: { path: string }) => [f.path, f])), legalDocuments: snapshot.legalDocuments };
+    model.instances.forEach(instance => { instance.part.status = "resolved"; });
+    const id = model.instances[1].id, onMove = vi.fn();
+    const props = { projectId: "catalog", bricks: [], imported: model, selectedId: id,
+      selectedType: "brick-1x2" as const, selectedColor: "#B40000", toolMode: "select" as const,
+      onMove, onSelect: vi.fn(), onPlace: vi.fn() };
+    act(() => root.render(<BuilderCanvas {...props} />));
+    await act(async () => { await vi.waitFor(() => expect(observed.scene).toBeDefined()); });
+    host = element.querySelector("[data-testid='canvas-3d']")!;
+    flushFrame();
+    const project = catalogProjection(), start = project(4, 0.4, 0), end = project(0.03, 0.4, 0.52);
+    const search = vi.spyOn(snapping, "magneticConstructionTransform");
+    pointer("pointerdown", start.x, start.y);
+    pointer("pointermove", end.x, end.y);
+    flushFrame();
+    expect(search).toHaveBeenCalledOnce();
+    const transform = search.mock.results[0].value.transform;
+    expect(transform.contacts).toHaveLength(2);
+    expect(transform.matrix).toEqual([1, 0, 0, 0, 0, 1, 0, -16, 0, 0, 1, 10]);
+    expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("2 Verbindungen");
+    const preview = observed.scene!.positions.slice();
+    pointer("pointerup", end.x, end.y);
+    expect(onMove).toHaveBeenCalledOnce();
+    expect(onMove.mock.calls[0][2]).toEqual(transform.matrix);
+    const committed = moveImported({ ...createEmptyDocument(), imported: model }, id, onMove.mock.calls[0][1], false, onMove.mock.calls[0][2]);
+    act(() => root.render(<BuilderCanvas {...props} imported={committed.imported} />));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+    flushFrame();
+    expect(observed.scene!.positions).toEqual(preview);
+    expect(snapping.activeConnections(committed.imported!, id)).toHaveLength(2);
+  });
   async function mount() {
     const model = engineFixture(1, 2), onMove = vi.fn(), onSelect = vi.fn();
     const props = { projectId: "one", bricks: [], imported: model, selectedId: model.instances[0].id,
@@ -99,12 +156,14 @@ describe("frame-coalesced drag transactions", () => {
   });
   it("coalesces connection searches and commits the exact off-grid live preview", async () => {
     const { onMove, point } = await mount();
+    const preview = vi.spyOn(softwareRendering, "previewSoftware");
     const snap = vi.spyOn(snapping, "magneticConstructionTransform").mockReturnValue({ transform: { matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" } });
     pointer("pointerdown", point.x, point.y);
     for (let n = 1; n <= 20; n++) pointer("pointermove", point.x + n * 4, point.y + 10);
     expect(snap).not.toHaveBeenCalled();
     flushFrame();
     expect(snap).toHaveBeenCalledOnce();
+    expect(preview.mock.calls.at(-1)?.[2]).toEqual(snap.mock.results[0].value.transform.matrix);
     pointer("pointerup", point.x + 80, point.y + 10);
     expect(snap).toHaveBeenCalledOnce();
     expect(onMove).toHaveBeenCalledOnce();

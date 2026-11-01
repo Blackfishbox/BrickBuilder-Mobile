@@ -5,6 +5,7 @@ import type { Affine, ImportedModel } from "../formats/types";
 import { hierarchyRecords, shadowRecords } from "./dataset";
 import type { Connector, Description, Diagnostic, Family, Section } from "./types";
 import { equivalentPrimitiveHierarchy } from "./hierarchy-equivalence";
+import { reviewedStandardMeta } from "./reviewed-standard";
 
 export function matrix4(m: Affine): Matrix4 {
   return new Matrix4().set(...m, 0, 0, 0, 1);
@@ -110,7 +111,7 @@ export function describeConnections(reference: string, model?: ImportedModel): D
       issue(path, "cycle-budget", "Cyclic or excessive hierarchy"); return [];
     }
     let result: Connector[] = [];
-    const record = shadows[path], installed = model?.resources[path], graph = hierarchy[path];
+    const record = reviewedStandardMeta(path, model) ?? shadows[path], installed = model?.resources[path], graph = hierarchy[path];
     if (!directOnly) {
       if (model && !installed) issue(path, "geometry-not-installed", "Metadata is available but this geometry dependency is not installed");
       const refs = installed ? installed.content.split(/\r?\n/).filter(l => /^\s*1\s/.test(l)) : graph?.refs;
@@ -158,7 +159,22 @@ export function describeConnections(reference: string, model?: ImportedModel): D
           for (const [g, frame] of frames.entries()) for (const c of visit(child, [...stack, path], true)) {
             const transform = matrix4(frame).scale(new Vector3(...scaling as [number, number, number]));
             const transformed = transformConnector(c, affine(transform));
-            if (transformed) result.push({ ...transformed, id: `${path}:${i + 1}:${g}/${c.id}`, clearId: options.id ?? c.clearId });
+            if (transformed) {
+              // An old include may describe the same ordinary socket using
+              // another part's obsolete bore depth/profile (e.g. 3066).
+              // Prefer the description inherited from the installed physical
+              // subpart, but only for a coincident standard stud opening.
+              const socket = (v: Connector) => v.family === "cylinder" && v.gender === "F" &&
+                v.caps === "one" && !v.centered && !v.slide && v.sections.length === 1 &&
+                ["R", "S"].includes(v.sections[0].shape) && v.sections[0].radius === 6 && v.length >= 4;
+              if (model && socket(transformed) &&
+                result.some(v => v.id.startsWith(`${path}/`) && model.resources[v.evidence.path] && socket(v) && v.group === transformed.group &&
+                  v.frame.every((value, i) => Math.abs(value - transformed.frame[i]) < 1e-8))) {
+                issue(path, "superseded-included-socket", `Installed subpart supplies this socket instead of ${c.evidence.path}`, i + 1);
+                continue;
+              }
+              result.push({ ...transformed, id: `${path}:${i + 1}:${g}/${c.id}`, clearId: options.id ?? c.clearId });
+            }
             else issue(path, "transform-policy", c.id, i + 1);
           }
           continue;
