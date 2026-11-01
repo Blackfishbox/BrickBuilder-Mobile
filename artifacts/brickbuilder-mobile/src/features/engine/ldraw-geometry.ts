@@ -12,10 +12,39 @@ export interface Surface {
 interface PendingSurface { colorCode: string; positions: number[]; edges: number[] }
 const cache = new WeakMap<ImportedModel, Map<string, Surface[]>>();
 const MAX_VERTICES = 1_500_000;
+/** Undo may remove newly acquired but now unused files without invalidating live parts. */
+export function sameSceneSources(previous: ImportedModel, next: ImportedModel): boolean {
+  if (previous.originalBytes !== next.originalBytes || previous.sourceText !== next.sourceText || previous.root !== next.root) return false;
+  if (previous.resources === next.resources) return true;
+  const removed = new Set<string>();
+  for (const [path, file] of Object.entries(previous.resources)) {
+    if (!next.resources[path]) removed.add(path);
+    else if (next.resources[path].content !== file.content) return false;
+  }
+  if (!removed.size) return true;
+  const visited = new Set<string>();
+  const references = next.instances.filter(instance => instance.part.status === "resolved").map(instance => instance.reference);
+  while (references.length) {
+    const reference = references.pop()!;
+    const path = candidates(reference).find(path => Object.hasOwn(next.resources, path)) ??
+      candidates(reference).find(path => Object.hasOwn(previous.resources, path));
+    if (!path || removed.has(path)) return false;
+    if (visited.has(path)) continue;
+    visited.add(path);
+    for (const line of next.resources[path].content.split(/\r?\n/)) {
+      if (/^\s*1\s/.test(line)) references.push(referenceLine(line).reference);
+    }
+  }
+  return true;
+}
 export function invalidateGeometry(model: ImportedModel) { cache.delete(model); }
 export function reuseGeometryCache(previous: ImportedModel | undefined, next: ImportedModel): void {
   if (!previous || previous === next || cache.has(next)) return;
   const compiled = cache.get(previous);
+  if (compiled && previous.resources === next.resources) {
+    cache.set(next, compiled);
+    return;
+  }
   if (compiled && Object.entries(previous.resources).every(([path, file]) => next.resources[path]?.content === file.content)) {
     cache.set(next, new Map(compiled));
   }

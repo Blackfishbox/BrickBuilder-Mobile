@@ -89,6 +89,9 @@ function addFaces(root: Group, surfaces: Surface[], instances: ImportedInstance[
   mesh.computeBoundingSphere();
   mesh.name = `ldraw:${instances[0].reference}`;
   mesh.userData.brickIds = instances.map(instance => instance.id);
+  mesh.userData.batchKey = `${instances[0].reference.toLowerCase()}|faces|${inherited ? "inherited" : "fixed"}|${alpha}`;
+  mesh.userData.inherited = inherited;
+  mesh.frustumCulled = false; // Per-ID bounds are maintained by the incremental index.
   root.add(mesh);
 }
 
@@ -135,6 +138,9 @@ function addEdges(root: Group, surfaces: Surface[], instances: ImportedInstance[
   // The shader's per-instance transform is not represented by Object3D.matrix.
   lines.frustumCulled = false;
   lines.name = "ldraw:instanced-edges";
+  lines.userData.brickIds = instances.map(instance => instance.id);
+  lines.userData.batchKey = `${instances[0].reference.toLowerCase()}|edges`;
+  lines.userData.localBounds = local;
   root.add(lines);
 }
 

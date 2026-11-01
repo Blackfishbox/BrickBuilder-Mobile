@@ -9,9 +9,22 @@
   Transparent and opaque source colors remain separate.
 - Carry immutable compiled buffers across instance-edit snapshots when the
   verified source resources are unchanged. Editing one part does not recompile
-  every geometry or deep-copy the original archive. Effective edits rebuild
-  drawing batches cooperatively, keeping the camera and model ground offset
-  fixed; incremental per-instance GPU updates are not yet implemented.
+  geometry or deep-copy the original archive. A persistent ID/slot index updates
+  only affected face matrices, edge rows and inherited colors. Ordinary moves
+  and recolors do not restart the preparation worker.
+- Migrate inherited-opacity slots without changing fixed printed colors or
+  unrelated batches. Swap-delete slots with stable external IDs; reserve capacity
+  before insertion, growing only full batches by 1.5x (minimum four slots).
+  Replaced instancing buffers are disposed; geometry/materials remain shared.
+  Empty batches retain their bounded capacity for undo and repeated placements.
+- Coalesce snapped drag previews into the next drawing frame. Pointer release
+  invokes the existing editor callback once; previews never enter history,
+  autosave or inventory accounting. Cancellation, lost capture, window blur,
+  project changes and multi-touch camera takeover restore committed transforms.
+- Keep the last valid scene visible during replacement preparation. Abort stale
+  work; install new scenes only on success. Additive source enrichment and
+  undo/redo use the same incremental path. Actual source changes and explicit
+  retries may still require full replacement.
 - Draw explicit edges with one instanced line object per part type, rather than
   one scene object per brick. Conditional type-5 edges remain unsupported.
 - Prepare cold geometry in a Web Worker. Only shared resource files and unique
@@ -23,7 +36,12 @@
   reduce pixel ratio; restore both after input settles. The vertical camera axis
   remains inverted.
 - Fit and resize using cached model bounds rather than repeatedly traversing
-  every imported object.
+  every imported object. Preserve the initial ground offset across edits.
+  Cached per-ID bounds narrow exact triangle picking; an established drag uses
+  its cached pivot/plane and never repeats scene picking on pointer movement.
+  Batch sorting bounds expand conservatively on edits, rather than being
+  nulled: Three.js would otherwise recalculate every instance's sphere during
+  render sorting, even with frustum culling disabled.
 - Dispose instance matrix/color buffers as well as materials and geometry when
   scenes or editable-brick batches are replaced.
 - List saved projects from small derived metadata records. Do not load another
@@ -50,7 +68,15 @@ be original geometry.
 The complete instances, source files, unknown metadata and original archive
 remain in the project. Reducing display detail never deletes model references.
 The software preview is a stability measure, not a full-fidelity replacement
-for hardware-accelerated rendering.
+for hardware-accelerated rendering. It retains bounded local source samples
+and rewrites only a changed part's slots, including reflected/rotated shading,
+inherited colors and alpha. Deletions return sample slots to a free list.
+Insertions reuse slots or take a sample from one donor at the limit; they do not
+re-prepare the complete scene or construct GPU geometry for imported hit tests.
+The sample allocation remains capped at 32,000 triangles, including retained
+local samples, but per-ID metadata/bounds still scale with the instance count.
+Beyond the limit, some instances may have no displayed triangles. This does not
+remove any source instance or alter saved data.
 
 ## Measured reference
 
@@ -100,6 +126,80 @@ Ordinary tests do not require a network service. Tests cover typed geometry
 sharing, instanced edges, original/fixed/translucent colors, partial-build
 cancellation, memory-budget rejection, instance-buffer disposal, bounded
 software preparation, worker payloads, summary backfill and summary deletion.
+Additional incremental regressions cover stable IDs after swap deletion,
+opacity migration, source enrichment, new reference insertion, reflected/sheared
+matrices, buffer reuse, budget rejection retaining the prior scene, software
+shading parity, sample-limit insertions and frame-coalesced drag rollback.
+
+## Reproducible incremental-edit measurements
+
+Measured in the workspace with Node.js 24 on 2026-11-01; these are CPU-side
+synthetic-fixture measurements, **not physical Android certification, GPU render
+times, input-to-photon latency or a guaranteed frame rate**. Timing varies with
+JIT warm-up, garbage collection and concurrent work. The redistributable fixture
+contains one reference, 200 inherited triangles, one fixed-color triangle and
+an explicit edge, repeated across opaque and translucent instances on a grid.
+The 4,000- and 10,000-instance cases represent 804,000 and 2,010,000 source
+triangles. They do not represent arbitrary geometry diversity.
+
+```sh
+pnpm --filter @workspace/brickbuilder-mobile exec vitest run \
+  src/features/engine/incremental.test.ts \
+  -t 'measures .* instances' --reporter=verbose --silent=false
+```
+
+The baseline executes the prior full-batch construction/disposal path using the
+same compiled geometry, rather than estimating it. Each edit/placement column
+averages 12 successive immutable updates; initial scene/index construction is
+outside the incremental timing. Picking is a single ray, comparing Three's
+whole-scene instanced raycast against cached bounds plus exact candidate tests.
+Preview means just the transient matrix/bounds update, averaged over 100 calls.
+Software preparation includes cooperative yields; its update is one immutable
+movement, not a full drawing frame.
+
+| CPU operation (ms) | 100 instances | 4,000 instances | 10,000 instances |
+| --- | ---: | ---: | ---: |
+| Move: previous full rebuild | 2.58 | 7.35 | 15.23 |
+| Move: incremental document update | 0.13 | 1.56 | 3.18 |
+| Transient single-part preview | 0.004 | 0.003 | 0.002 |
+| Placement: previous full rebuild | 1.03 | 5.95 | 11.97 |
+| Placement: incremental | 0.23 | 2.02 | 4.46 |
+| Delete all 12 newly placed parts: incremental | 0.33 | 3.13 | 7.06 |
+| Picking: previous whole-scene raycast | 2.46 | 3.75 | 4.98 |
+| Picking: bounds-indexed exact candidates | 0.93 | 1.42 | 3.26 |
+| Software: previous complete preparation | 62.86 | 49.60 | 72.65 |
+| Software: incremental movement | 2.31 | 2.32 | 4.14 |
+
+Structural results are more repeatable than wall-clock times:
+
+- For 12 moves: full builds **12 → 0**, drawing-buffer allocations **48 draw
+  objects → 0**, incremental worker requests **0**, capacity growths **0**.
+  Existing face/edge objects and their typed buffers remain identical.
+- The selected fixture ray tests **100 / 4,000 / 10,000 cached boxes**, then only
+  **2 / 4 / 4 candidate face meshes**, rather than iterating all face instances.
+  The counter is candidate mesh triangle-test calls, not individual triangles.
+  Established drags perform **zero repeated scene picks**.
+- All three models retain four drawing objects. Initial allocated drawing
+  buffers are **33,332 / 766,532 / 1,894,532 bytes**. Moving changes none of
+  those allocations.
+- Twelve placements cause **three capacity growths** per fixture and create
+  **zero new geometry batches** for the known reference/opacity. Retained
+  buffers become **41,516 / 1,091,916 / 2,707,916 bytes**. Deletion reuses
+  capacity rather than repeatedly shrinking/reallocating it. New references or
+  unseen opacity groups can allocate their own batches.
+- Incremental document diffs still scan the instance list and allocate small
+  JavaScript maps/sets; cached-bound picking is still linear in instance count.
+  The zero-allocation statement applies to **drawing buffers on movement**, not
+  all JavaScript allocations or renderer/driver internals.
+
+A 402×874 emulated-browser check used a new self-contained synthetic project.
+It verified a visible pre-release preview with unchanged IndexedDB data,
+release/autosave, exactly one Undo/Redo step, reload persistence, and
+pointer-cancel rollback without an extra history entry. That browser used the
+software compatibility renderer; it is not hardware WebGL or Android evidence.
+GPU batch transforms, fixed/inherited color grouping, opacity migration and
+disposal are covered by the automatic Three.js object/buffer regressions, not
+by a physical-device rendering certification.
 
 ## Remaining limits
 

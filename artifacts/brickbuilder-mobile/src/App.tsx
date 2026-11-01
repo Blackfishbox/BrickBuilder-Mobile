@@ -258,6 +258,7 @@ function App() {
           <div className="canvas-host">
             <Suspense fallback={<div className="canvas-loading">3D-Arbeitsfläche wird geladen …</div>}>
               <BuilderCanvas
+                projectId={editor.document.id}
                 bricks={editor.bricks}
                 imported={editor.imported}
                 selectedId={editor.selectedId}

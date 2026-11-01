@@ -31,9 +31,10 @@ import { createImportedGroupAsync, disposeImportedScene, SceneBudgetExceeded } f
 import { prepareGeometry } from "./prepare-geometry";
 import { reuseGeometryCache } from "./ldraw-geometry";
 import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
-import { createSoftwareScene, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
+import { createSoftwareScene, updateSoftwareScene, previewSoftware, restoreSoftware, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
+import { InstanceIndex, instanceIndex } from "./instance-index";
 import { createBuilderLighting } from "./lighting";
-import type { ImportedModel } from "../formats/types";
+import type { Affine, ImportedModel } from "../formats/types";
 
 import {
   BRICK_DEFINITIONS,
@@ -46,6 +47,7 @@ import {
 } from "@/features/editor/model";
 
 interface BuilderCanvasProps {
+  projectId?: string;
   bricks: Brick[];
   imported?: ImportedModel;
   selectedId: string | null;
@@ -79,6 +81,8 @@ interface DragCandidate {
   origin: Position3;
   moved: boolean;
   destination: Position3 | null;
+  matrix?: Affine;
+  planeStart: Position3 | null;
 }
 
 interface BrickHit {
@@ -184,6 +188,7 @@ class FallbackRenderer {
       const faces: { points: ProjectedPoint[]; depth: number; color: string; alpha: number; selected: boolean }[] = [];
       const stride = interactive ? Math.max(1, Math.ceil(imported.triangleCount / INTERACTIVE_TRIANGLE_BUDGET)) : 1;
       for (let triangle = 0; triangle < imported.triangleCount; triangle += stride) {
+            if (imported.alpha[triangle] === 0) continue;
             const index = triangle * 9, vertices = imported.positions;
             const points = [0, 3, 6].map(offset => project(vertices[index + offset], vertices[index + offset + 1] + importOffset, vertices[index + offset + 2]));
             if (points.some(p => p.depth < 0.1)) continue;
@@ -409,7 +414,13 @@ function pointerDistance(first: PointerPoint, second: PointerPoint): number {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
+function softwareWarning(scene: SoftwareScene): string {
+  const samples = scene.triangleCount - scene.free.length;
+  return `Kompatibilitätsansicht ohne WebGL: ${samples.toLocaleString("de-DE")} von ${scene.sourceTriangles.toLocaleString("de-DE")} Dreiecken. Während der Bewegung sind Details reduziert; alle Projektdaten bleiben erhalten.`;
+}
+
 export function BuilderCanvas({
+  projectId,
   bricks,
   imported,
   selectedId,
@@ -427,6 +438,7 @@ export function BuilderCanvas({
   const brickRootRef = useRef<Group | null>(null);
   const importedRootRef = useRef<Group | null>(null);
   const sceneModelRef = useRef<ImportedModel | undefined>(undefined);
+  const sceneProjectRef = useRef<string | undefined>(undefined);
   const selectionOutlineRef = useRef<Box3Helper | null>(null);
   const importedBoundsRef = useRef<Box3 | null>(null);
   const softwareSceneRef = useRef<SoftwareScene | undefined>(undefined);
@@ -437,12 +449,17 @@ export function BuilderCanvas({
   const [renderWarning, setRenderWarning] = useState<string | null>(null);
   const [buildAttempt, setBuildAttempt] = useState(0);
   const [forceCompatibility, setForceCompatibility] = useState(false);
+  const pendingPreviewRef = useRef<(() => void) | null>(null);
+  const rollbackRef = useRef<(() => void) | null>(null);
+  const previewBrickRef = useRef<Brick | null>(null);
+  const attemptRef = useRef(-1);
   const updateImportedSelection = () => {
     const old = selectionOutlineRef.current;
-    if (old) { sceneRef.current?.remove(old); old.geometry.dispose(); disposeMaterial(old.material); selectionOutlineRef.current = null; }
     const id = propsRef.current.selectedId, root = importedRootRef.current;
+    const bounds = id && root ? importedSelectionBounds(root, id) : null;
+    if (old && bounds) { old.box.copy(bounds); invalidatorRef.current?.(); return; }
+    if (old) { sceneRef.current?.remove(old); old.geometry.dispose(); disposeMaterial(old.material); selectionOutlineRef.current = null; }
     if (id && root) {
-      const bounds = importedSelectionBounds(root, id);
       if (bounds) {
         const outline = new Box3Helper(bounds, 0xe45e32);
         for (const material of Array.isArray(outline.material) ? outline.material : [outline.material]) material.depthTest = false;
@@ -455,6 +472,7 @@ export function BuilderCanvas({
   const invalidatorRef = useRef<(() => void) | null>(null);
   const raycasterRef = useRef(new Raycaster());
   const propsRef = useRef({
+    projectId,
     bricks,
     imported,
     selectedId,
@@ -480,6 +498,7 @@ export function BuilderCanvas({
   });
 
   propsRef.current = {
+    projectId,
     bricks,
     imported,
     selectedId,
@@ -570,6 +589,9 @@ export function BuilderCanvas({
       if (animationFrame !== null) return;
       animationFrame = window.requestAnimationFrame(() => {
         animationFrame = null;
+        const preview = pendingPreviewRef.current;
+        pendingPreviewRef.current = null;
+        preview?.();
         const interactive = performance.now() - interactionTimeRef.current < 180;
         const activeRenderer = rendererRef.current ?? renderer;
         if (activeRenderer instanceof WebGLRenderer) {
@@ -584,7 +606,7 @@ export function BuilderCanvas({
           activeRenderer.render(
             camera,
             cameraStateRef.current.target,
-            propsRef.current.bricks,
+            previewBrickRef.current ? propsRef.current.bricks.map(brick => brick.id === previewBrickRef.current!.id ? previewBrickRef.current! : brick) : propsRef.current.bricks,
             propsRef.current.selectedId,
             softwareSceneRef.current,
             importedOffsetRef.current,
@@ -648,21 +670,50 @@ export function BuilderCanvas({
     if (!scene || !camera) return;
     const previous = importedRootRef.current;
     const previousModel = sceneModelRef.current;
-    const sameModel = !!imported && previousModel?.originalBytes === imported.originalBytes;
+    const sameModel = sceneProjectRef.current === projectId && !!imported && previousModel?.originalBytes === imported.originalBytes;
     const previousOffset = importedOffsetRef.current;
+    rollbackRef.current?.();
+    const retry = attemptRef.current !== buildAttempt;
+    attemptRef.current = buildAttempt;
     if (imported) reuseGeometryCache(previousModel, imported);
-    sceneModelRef.current = imported;
-    if (previous) { scene.remove(previous); disposeImported(previous); }
-    importedRootRef.current = null;
-    importedBoundsRef.current = null;
-    softwareSceneRef.current = undefined;
-    importedOffsetRef.current = 0;
+    if (imported && sameModel && !retry && !forceCompatibility) {
+      try {
+        const index = previous && instanceIndex(previous);
+        const software = softwareSceneRef.current;
+        if ((index && index.update(imported)) || (software && updateSoftwareScene(software, imported))) {
+          sceneModelRef.current = imported;
+          setSceneStatus(null);
+          if (software) setRenderWarning(softwareWarning(software));
+          updateImportedSelection();
+          return;
+        }
+      } catch (error) {
+        setRenderWarning(`Darstellung konnte nicht aktualisiert werden: ${error instanceof Error ? error.message : String(error)}. Die bisherige Ansicht bleibt erhalten.`);
+        return;
+      }
+    }
+    // Software stays incremental after an explicit switch to compatibility mode.
+    if (imported && sameModel && !retry && softwareSceneRef.current && forceCompatibility) {
+      try {
+        if (updateSoftwareScene(softwareSceneRef.current, imported)) {
+          sceneModelRef.current = imported; setSceneStatus(null);
+          setRenderWarning(softwareWarning(softwareSceneRef.current));
+          invalidatorRef.current?.(); return;
+        }
+      } catch (error) { setRenderWarning(`Kompatibilitätsansicht konnte nicht aktualisiert werden: ${String(error)}`); return; }
+    }
     const controller = new AbortController();
     buildControllerRef.current = controller;
     setRenderWarning(null);
     setSceneStatus(imported ? "3D-Modell wird vorbereitet …" : null);
     const build = async () => {
-      if (!imported) return;
+      if (!imported) {
+        if (previous) { scene.remove(previous); disposeImported(previous); }
+        importedRootRef.current = null; softwareSceneRef.current = undefined;
+        importedBoundsRef.current = null; importedOffsetRef.current = 0; sceneModelRef.current = undefined;
+        updateImportedSelection();
+        return;
+      }
       let lastProgress = 0;
       const progress = (stage: string) => (completed: number, total: number) => {
         if (controller.signal.aborted || performance.now() - lastProgress < 80) return;
@@ -671,6 +722,7 @@ export function BuilderCanvas({
       };
       await prepareGeometry(imported, { signal: controller.signal, onProgress: progress("Geometrie") });
       let root: Group | null = null, bounds: Box3;
+      let software: SoftwareScene | undefined;
       if (rendererRef.current instanceof WebGLRenderer && !forceCompatibility) {
         try {
           const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
@@ -684,8 +736,16 @@ export function BuilderCanvas({
           // driver/context crash or throwing away the user's model.
         }
       }
-      if (root) bounds = new Box3().setFromObject(root);
+      if (root) {
+        try {
+          const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+          new InstanceIndex(root, imported, (memory <= 1 ? 32 : memory <= 2 ? 64 : 96) * 1024 * 1024);
+          bounds = new Box3().setFromObject(root);
+        } catch (error) { disposeImported(root); throw error; }
+      }
       else {
+        software = await createSoftwareScene(imported, { signal: controller.signal, onProgress: progress("Kompatibilitätsansicht") });
+        controller.signal.throwIfAborted();
         if (rendererRef.current instanceof WebGLRenderer) {
           const previousRenderer = rendererRef.current;
           previousRenderer.dispose();
@@ -700,13 +760,15 @@ export function BuilderCanvas({
           hostRef.current!.appendChild(fallback.domElement);
           rendererRef.current = fallback;
         }
-        const software = await createSoftwareScene(imported, { signal: controller.signal, onProgress: progress("Kompatibilitätsansicht") });
-        controller.signal.throwIfAborted();
-        softwareSceneRef.current = software;
         bounds = software.bounds.clone();
-        setRenderWarning(`Kompatibilitätsansicht ohne WebGL: ${software.triangleCount.toLocaleString("de-DE")} von ${software.sourceTriangles.toLocaleString("de-DE")} Dreiecken. Während der Bewegung sind Details reduziert; alle Projektdaten bleiben erhalten.`);
+        setRenderWarning(softwareWarning(software));
       }
       if (controller.signal.aborted) { if (root) disposeImported(root); return; }
+      if (previous) { scene.remove(previous); disposeImported(previous); }
+      importedRootRef.current = null;
+      softwareSceneRef.current = software;
+      sceneModelRef.current = imported;
+      sceneProjectRef.current = projectId;
       if (!bounds.isEmpty()) {
         const offset = sameModel ? previousOffset : Math.max(0, -bounds.min.y);
         if (root) root.position.y = offset;
@@ -733,14 +795,10 @@ export function BuilderCanvas({
     invalidatorRef.current?.();
     return () => {
       controller.abort();
-      softwareSceneRef.current = undefined;
-      if (importedRootRef.current) {
-        scene.remove(importedRootRef.current);
-        disposeImported(importedRootRef.current);
-        importedRootRef.current = null;
-      }
     };
-  }, [imported, buildAttempt, forceCompatibility]);
+  }, [imported, buildAttempt, forceCompatibility, projectId]);
+
+  useEffect(() => { rollbackRef.current?.(); }, [projectId, toolMode]);
 
   useEffect(() => { updateImportedSelection(); }, [selectedId]);
 
@@ -862,7 +920,7 @@ export function BuilderCanvas({
       const root = brickRootRef.current;
       if (!raycaster || !root) return null;
       importedRootRef.current?.updateMatrixWorld(true);
-      const brickMeshes = [...root.children, ...(importedRootRef.current?.children ?? [])].filter(
+      const brickMeshes = root.children.filter(
         (child): child is Mesh =>
           child instanceof Mesh &&
           (typeof child.userData.brickId === "string" ||
@@ -870,9 +928,13 @@ export function BuilderCanvas({
       );
       const intersections = raycaster.intersectObjects(brickMeshes, false);
       const hit = intersections[0];
-      const software = softwareSceneRef.current;
+      const sceneMatches = sceneModelRef.current === propsRef.current.imported && sceneProjectRef.current === propsRef.current.projectId;
+      const importedRoot = sceneMatches ? importedRootRef.current : null;
+      const importedHit = importedRoot ? instanceIndex(importedRoot)?.pick(raycaster) : null;
+      const software = sceneMatches ? softwareSceneRef.current : undefined;
       const softwareHit = software ? pickSoftwareInstance(raycaster.ray, software, importedOffsetRef.current) : null;
-      if (softwareHit && (!hit || softwareHit.point.distanceTo(raycaster.ray.origin) < hit.distance)) return softwareHit;
+      const sourceHit = importedHit ?? softwareHit;
+      if (sourceHit && (!hit || sourceHit.point.distanceTo(raycaster.ray.origin) < hit.distance)) return sourceHit;
       if (!hit) return null;
       let id = hit.object.userData.brickId as string | undefined;
       if (!id && hit.instanceId !== undefined) {
@@ -892,6 +954,49 @@ export function BuilderCanvas({
         : null;
     };
 
+    const rollback = () => {
+      pendingPreviewRef.current = null;
+      const drag = dragRef.current;
+      if (drag) {
+        if (importedRootRef.current) instanceIndex(importedRootRef.current)?.restore(drag.id);
+        if (softwareSceneRef.current) restoreSoftware(softwareSceneRef.current, drag.id);
+        const brick = propsRef.current.bricks.find(value => value.id === drag.id);
+        if (brick) applyBrickPreview(brick);
+      }
+      previewBrickRef.current = null;
+      dragRef.current = null; clickRef.current = null;
+      updateImportedSelection();
+    };
+    rollbackRef.current = rollback;
+    const applyBrickPreview = (brick: Brick) => {
+      const dummy = new Object3D();
+      dummy.position.set(brick.x, brick.y, brick.z); dummy.rotation.y = brick.rotation * Math.PI / 180; dummy.updateMatrix();
+      for (const child of brickRootRef.current?.children ?? []) {
+        if (child instanceof InstancedMesh) {
+          const index = (child.userData.brickIds as string[]).indexOf(brick.id);
+          if (index >= 0) { child.setMatrixAt(index, dummy.matrix); child.instanceMatrix.needsUpdate = true; child.boundingSphere = null; }
+        } else if (child.userData.isSelectionOutline) child.position.set(brick.x, brick.y, brick.z);
+      }
+    };
+    const queuePreview = (drag: DragCandidate) => {
+      pendingPreviewRef.current = () => {
+        if (dragRef.current !== drag || !drag.destination) return;
+        const position = drag.destination;
+        if (drag.matrix) {
+          const matrix = [...drag.matrix] as Affine;
+          matrix[3] = position.x * 20; matrix[7] = -(position.y - importedOffsetRef.current) * 20; matrix[11] = position.z * 20;
+          if (importedRootRef.current) instanceIndex(importedRootRef.current)?.preview(drag.id, matrix);
+          if (softwareSceneRef.current) previewSoftware(softwareSceneRef.current, drag.id, matrix);
+          updateImportedSelection();
+        } else {
+          const brick = propsRef.current.bricks.find(value => value.id === drag.id);
+          if (brick) { previewBrickRef.current = { ...brick, ...position }; applyBrickPreview(previewBrickRef.current); }
+        }
+      };
+      interactionTimeRef.current = performance.now();
+      invalidatorRef.current?.();
+    };
+
     const startGesture = () => {
       const points = [...pointersRef.current.values()];
       if (points.length < 2) return;
@@ -906,7 +1011,7 @@ export function BuilderCanvas({
         cameraDistance: cameraState.distance,
         target: cameraState.target.clone(),
       };
-      dragRef.current = null;
+      rollback();
       clickRef.current = null;
     };
 
@@ -940,6 +1045,8 @@ export function BuilderCanvas({
               origin,
               moved: false,
               destination: null,
+              matrix: instance?.matrix,
+              planeStart: projectToPlane(point, origin.y),
             };
           }
         } else {
@@ -1005,15 +1112,23 @@ export function BuilderCanvas({
         const dy = event.clientY - start.start.y;
         if (Math.hypot(dx, dy) > 5) start.moved = true;
         if (start.moved) {
-          start.destination = projectToPlane(
+          const destination = projectToPlane(
             { x: event.clientX, y: event.clientY },
             start.origin.y,
           );
+          if (destination) {
+            start.destination = {
+              x: Math.round((start.origin.x + destination.x - (start.planeStart?.x ?? start.origin.x)) * 2) / 2,
+              y: start.origin.y,
+              z: Math.round((start.origin.z + destination.z - (start.planeStart?.z ?? start.origin.z)) * 2) / 2,
+            };
+            queuePreview(start);
+          }
           return;
         }
       }
 
-      if (!start || !findBrick(start.start)) {
+      if (!start) {
         const deltaX = previous ? currentPoint.x - previous.x : 0;
         const deltaY = previous ? currentPoint.y - previous.y : 0;
         const cameraState = cameraStateRef.current;
@@ -1034,8 +1149,10 @@ export function BuilderCanvas({
         const drag = dragRef.current;
         if (drag?.pointerId === event.pointerId && drag.moved) {
           if (drag.destination) {
-            const imported = current.imported?.instances.some(instance => instance.id === drag.id);
-            current.onMove(drag.id, { ...drag.destination, y: drag.destination.y - (imported ? importedOffsetRef.current : 0) });
+            const destination = { ...drag.destination, y: drag.destination.y - (drag.matrix ? importedOffsetRef.current : 0) };
+            const changed = drag.destination.x !== drag.origin.x || drag.destination.z !== drag.origin.z;
+            rollback();
+            if (changed) current.onMove(drag.id, destination);
           }
         } else if (current.toolMode === "build" && click && !click.moved) {
           const hit = findBrick(point);
@@ -1048,7 +1165,7 @@ export function BuilderCanvas({
             destination = projectToPlane(point, 0);
           }
           if (destination) current.onPlace({ ...destination, y: destination.y - importedOffsetRef.current });
-        } else if (current.toolMode === "select" && !drag) {
+        } else if (current.toolMode === "select" && !drag && click && !click.moved) {
           const hit = findBrick(point);
           current.onSelect(hit?.id ?? null);
         }
@@ -1067,7 +1184,7 @@ export function BuilderCanvas({
     const onPointerCancel = (event: PointerEvent) => {
       pointersRef.current.delete(event.pointerId);
       pointerLastRef.current.delete(event.pointerId);
-      dragRef.current = null;
+      rollback();
       gestureStartRef.current = null;
       clickRef.current = null;
     };
@@ -1076,11 +1193,17 @@ export function BuilderCanvas({
     host.addEventListener("pointermove", onPointerMove, { passive: false });
     host.addEventListener("pointerup", onPointerUp, { passive: false });
     host.addEventListener("pointercancel", onPointerCancel, { passive: false });
+    host.addEventListener("lostpointercapture", onPointerCancel);
+    const onBlur = () => { rollback(); pointersRef.current.clear(); pointerLastRef.current.clear(); };
+    window.addEventListener("blur", onBlur);
     return () => {
       host.removeEventListener("pointerdown", onPointerDown);
       host.removeEventListener("pointermove", onPointerMove);
       host.removeEventListener("pointerup", onPointerUp);
       host.removeEventListener("pointercancel", onPointerCancel);
+      host.removeEventListener("lostpointercapture", onPointerCancel);
+      window.removeEventListener("blur", onBlur);
+      rollback(); rollbackRef.current = null;
     };
   }, []);
 
