@@ -1,182 +1,173 @@
-# BrickBuilder Mobile — Architektur und Phase 1
+# BrickBuilder Mobile — architecture and foundation
 
-## Produktgrenze
+## Product boundary
 
-BrickBuilder Mobile ist eine eigenständige, offline-orientierte PWA. Die erste
-Ausbaustufe ist ein lokaler 3D-Editor mit drei einfachen Steintypen. Es gibt
-keinen Server, kein Konto und keine kostenpflichtige Laufzeitabhängigkeit.
-Geometrien in Phase 1 sind prozedural erzeugt; sie sind kein Ersatz für die
-LDraw-Bibliothek.
+BrickBuilder Mobile is an independent, offline-oriented PWA. The foundation
+release is a local 3D editor with three simple brick types. No server, account
+or paid runtime dependency is required. Foundation geometry is procedural, not
+a replacement for the LDraw library.
 
-## Komponentenarchitektur
+This document retains the original foundation plan for context. Later
+parts/import extensions are described below; future-tense foundation notes
+are not a statement that those implemented extensions are absent.
+
+## Component architecture
 
 ```text
 React UI
   └─ EditorShell / mobile controls
-      ├─ useBuilder (Dokument, Auswahl, Werkzeuge, Verlauf, Autosave)
-      ├─ BuilderCanvas (Three.js, Raycasting, Kamera, Touch-Eingaben)
-      │   └─ InstancedMesh-Gruppen nach Steintyp und Farbe
-      └─ Parts drawer / palette (Baukasten und paketweise LDraw-Bibliothek)
+      ├─ useBuilder (document, selection, tools, history, autosave)
+      ├─ BuilderCanvas (Three.js, raycasting, camera, touch input)
+      │   └─ InstancedMesh groups by brick type and color
+      └─ Parts drawer / palette (builder bricks and packaged LDraw library)
 
 Domain
-  ├─ versioniertes BuilderDocument
-  ├─ Brick- und BrickType-Modelle
-  ├─ Raster-/Snap-Funktionen
-  └─ History (Undo/Redo)
+  ├─ Versioned BuilderDocument
+  ├─ Brick and BrickType models
+  ├─ Grid/snap functions
+  └─ History (undo/redo)
 
-Persistenz & Offline
-  ├─ Dexie / IndexedDB: Projekte, aktives Projekt, Wiederherstellung, Teilepakete
-  ├─ Debounced Autosave nach lokalen Änderungen
-  └─ Service Worker: Vite-App-Shell, statische Assets, Navigation-Fallback
+Persistence & offline
+  ├─ Dexie / IndexedDB: projects, active project, recovery, parts packages
+  ├─ Debounced autosave after local changes
+  └─ Service worker: Vite app shell, static assets, navigation fallback
 
 Worker
-  └─ Modellanalyse und räumliche Kennzahlen aus dem Editor-Hauptthread auslagern
+  └─ Model analysis and spatial metrics off the editor's main thread
 
-Erweiterungspunkte (spätere Phasen)
-  ├─ parts/: installierte LDraw-Originaldateien für spätere Geometrie-/Formatadapter
-  ├─ catalog/bricklink: getrennte BrickLink-IDs, Farben, Preise und Verfügbarkeit
-  └─ formats/{internal,ldr,mpd,io}: unabhängige Importer/Exporter und Roundtrips
+Extension boundaries
+  ├─ parts/: installed original LDraw files for geometry/format adapters
+  ├─ catalog/bricklink: separate BrickLink IDs, colors, prices and availability
+  └─ formats/{internal,ldr,mpd,io}: independent importers/exporters and roundtrips
 ```
 
-## Vorgeschlagene Ordnerstruktur
+## Original directory proposal
+
+This is the foundation proposal, not an exact current directory listing.
 
 ```text
 src/
-  app/                 # PWA-Registrierung und Anwendungsrahmen
-  components/mobile/   # Touch-optimierte Bedienelemente
-  features/editor/     # Dokumentmodell, Befehle, Verlauf, React-Hook
-  features/engine/     # Three.js-Szene, Kamera, Raycasting, Worker
-  features/parts/      # lokaler Phase-1-Teilekatalog und Filter
-  features/projects/   # Projektübersicht und Wiederherstellungsablauf
-  storage/             # IndexedDB-Schema und Repository
-  formats/internal/    # internes JSON, Versionierung und Migration
-  formats/ldr/         # später: LDR-Import/-Export getrennt
-  formats/mpd/         # später: MPD-Import/-Export getrennt
-  formats/io/          # später: isolierter IO-Adapter, unbekannte Metadaten
-  workers/             # aufwendige Modell- und Katalogberechnungen
-  test/                # Test-Setup und Beispielmodelle
+  app/                 # PWA registration and application shell
+  components/mobile/   # Touch-optimized controls
+  features/editor/     # Document model, commands, history, React hook
+  features/engine/     # Three.js scene, camera, raycasting, worker
+  features/parts/      # Local foundation catalog and filters
+  features/projects/   # Project list and recovery flow
+  storage/             # IndexedDB schema and repository
+  formats/internal/    # Internal JSON, versioning and migration
+  formats/ldr/         # Separate LDR import/export
+  formats/mpd/         # Separate MPD import/export
+  formats/io/          # Isolated IO adapter, unknown metadata
+  workers/             # Expensive model/catalog calculations
+  test/                # Test setup and sample models
 public/
-  icons/               # lokale PWA-Symbole
+  icons/               # Local PWA icons
 ```
 
-Die Verzeichnisse für spätere LDraw-/BrickLink-/Dateiformat-Arbeit sind
-Erweiterungspunkte, keine Behauptung, dass diese Funktionen bereits existieren.
+These extension boundaries do not by themselves claim any feature or external
+format compatibility.
 
-## Datenmodell (internes JSON v1)
+## Data model (internal JSON v1)
 
 - `BuilderDocument`: `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`,
   `bricks[]`, `metadata`.
-- `Brick`: stabile ID, interner Steintyp, Farbe, Position `(x,y,z)` in
-  Baueinheiten und Y-Rotation in Vierteldrehungen.
-- `BrickType`: interne IDs `brick-2x4`, `brick-2x2`, `brick-1x2`. Diese IDs
-  werden getrennt von LDraw- und BrickLink-Teilenummern gehalten.
-- `metadata`: versionsfähiges Objekt, das später unbekannte Import-Metadaten
-  aufnehmen kann.
-- Die Phase-1-Farben sind lokale Hex-Farben; sie sind noch keine offizielle
-  LDraw-/BrickLink-Farbzuordnung.
+- `Brick`: stable ID, internal brick type, color, `(x,y,z)` position in building
+  units and Y rotation in quarter turns.
+- `BrickType`: internal IDs `brick-2x4`, `brick-2x2`, `brick-1x2`, separate from
+  LDraw and BrickLink part numbers.
+- `metadata`: versionable object that can preserve unknown import metadata.
+- Foundation colors are local hex colors, not an official LDraw/BrickLink mapping.
 
-Horizontal liegen Noppen auf einem 1-Baueinheit-Raster; das Zentrum eines
-Steins kann durch unterschiedliche Grundflächen auf halbe Einheiten fallen.
-Y wird auf die Steinhöhe eingerastet. Intern werden Einheiten verwendet, nicht
-Screenspace-Pixel. Die Engine ist für visuelle Rasterplatzierung ausgelegt;
-mechanische Verbindungen werden erst mit echten Teilegeometrien ergänzt.
+Horizontal studs use a one-unit grid; different footprints can put brick centers
+on half units. Y snaps to brick height. The model uses units, not screen pixels.
+The engine targets visual grid placement; this is not a mechanical connection
+solver.
 
-## Implementierungsplan
+## Historical implementation plan
 
-1. [x] Mobiles Editor-Gerüst und responsive Hoch-/Querformat-Ansicht.
-2. [x] Three.js-Grundplatte, Raster, parametrisierte Steine, Kamera und Raycasting.
-3. [x] Platzieren, Auswählen, Verschieben, Drehen, Löschen und einfache Snaps.
-4. [x] Undo/Redo, lokale Projekte, Autosave und Wiederherstellung über IndexedDB.
-5. [x] PWA-Manifest, Service Worker und App-Shell-Cache für Offline-Aufruf.
-6. [x] Vitest für Snap-, History-, Dokument- und Speicherlogik.
-7. [ ] LDraw-Pakete, BrickLink-Katalogdaten, Import/Export und größere
-       Performance-Läufe separat implementieren und prüfen.
+1. [x] Mobile editor shell and responsive portrait/landscape layout.
+2. [x] Three.js baseplate, grid, parametric bricks, camera and raycasting.
+3. [x] Place, select, move, rotate, delete and simple snaps.
+4. [x] Undo/redo, local projects, autosave and IndexedDB recovery.
+5. [x] PWA manifest, service worker and app-shell caching.
+6. [x] Vitest coverage for snapping, history, documents and storage.
+7. [ ] Implement and verify LDraw packages, BrickLink catalog data, import/export
+       and larger performance runs separately from the foundation release.
 
-## Offline-Strategie
+Item 7 records the original scope separation, not current completion of every
+extension. The implemented subsets below and in the README are authoritative.
 
-Der Build enthält alle Editor-Bestandteile lokal. Der Service Worker cached
-App-Shell und gebündelte Assets; es werden für die Kernbedienung keine
-Remote-Schriftarten, Katalog-APIs oder Bild-CDNs benötigt. Projekte und
-Wiederherstellungspunkte liegen lokal in IndexedDB. Autosave läuft nach einer
-kurzen Verzögerung und ein explizites Speichern ist zusätzlich verfügbar.
-Installierte PWA und bereits geladene Version funktionieren ohne Netzwerk;
-neue Teilepakete benötigen eine Netzwerkverbindung. Sie werden nicht vorab vom
-Service Worker geladen, sondern nur auf ausdrücklichen Paketdownload in
-IndexedDB gespeichert.
+## Offline strategy
 
-### Lokale LDraw-Bibliothek
+The build includes editor components locally. The worker caches the app shell
+and bundled assets; core operation needs no remote fonts, catalog APIs or image
+CDNs. Projects/recovery points live in IndexedDB. Autosave runs after a short
+delay, with explicit saving also available. Once initial loading/cache
+population succeeds, the cached app can operate offline. New parts packages
+require network access; they are not precached, but stored in IndexedDB after
+an explicit package download.
 
-`features/parts/` enthält einen gebündelten Paketkatalog und einen atomaren
-Installer. Zwei kleine, einzeln ladbare Snapshots (Steine und Platten) enthalten
-je sechs Teile, sämtliche rekursiven Unterteile/Primitive und Lizenztexte.
-SHA-256, Bytezahl, Paketversion, Lizenzheader und Abhängigkeiten werden vor dem
-Schreiben geprüft. IndexedDB-Schema v2 ergänzt die Tabellen, ohne bestehende
-Projekte umzuschreiben. Fehler lassen vorhandene Pakete unverändert.
-Suche nach Name, LDraw-Nummer und Kategorie liest ausschließlich lokale Daten.
-Indexdaten, Originaldateien und Rechtstexte sind nach Browserneustart verfügbar.
-Browserdatenlöschung oder Speicherverdrängung kann lokale Daten dennoch löschen.
+### Local LDraw library
 
-Interne Katalog-ID (`ldraw-bricks:3001`), LDraw-ID (`3001`), interner
-Editor-Steintyp (`brick-2x4`) und optionales späteres `brickLinkId` sind
-getrennte Felder. Es gibt keine implizite Gleichsetzung mit BrickLink.
-Nur die drei bereits unterstützten Formen sind aus der Bibliothek im Editor
-auswählbar; alle übrigen Einträge sind als „Nur Katalog“ gekennzeichnet.
-Das Laden/Rendern originaler LDraw-Geometrie ist ein eigener Ausbau, kein
-stillschweigender Ersatz durch unpassende prozedurale Formen.
+`features/parts/` contains a bundled catalog and atomic installer. Two small,
+independently installable snapshots (bricks and plates) each contain six parts,
+all recursive subparts/primitives and legal documents. SHA-256, byte length,
+package version, license headers and dependencies are checked before writing.
+IndexedDB schema v2 adds tables without rewriting existing projects.
+Failures leave existing packages unchanged. Name, LDraw number and category
+search uses local data only. Index data, original files and legal documents
+survive browser restarts, but browser cleanup or storage eviction can remove them.
 
-Quellenprüfung, Urheber und Lizenzpflichten stehen in
-[`parts-licensing.md`](parts-licensing.md).
+Internal catalog ID (`ldraw-bricks:3001`), LDraw ID (`3001`), editor type
+(`brick-2x4`) and optional `brickLinkId` are separate fields. No BrickLink
+equivalence is inferred. Only the three supported shapes are selectable for
+placement; other entries are marked **Nur Katalog** in the German UI.
+Original LDraw geometry rendering is a separate extension, not a silent
+substitution with an unsuitable procedural shape.
 
-## IO-Kompatibilität und Risiken
+See [parts licensing](parts-licensing.md) for sources, authors and obligations.
 
-IO wird als separater Adapter geplant und darf nicht mit LDR/MPD oder dem
-internen Format vermischt werden. Vor einer Kompatibilitätsaussage braucht es
-selbst erstellte, lizenzrechtlich unbedenkliche IO-Testdateien. Der Adapter muss
-Containerstruktur, Submodelle und unbekannte Metadaten explizit modellieren;
-Import und Export bekommen getrennte Tests einschließlich Roundtrip. Diese
-Arbeit ist nicht Bestandteil der ersten Phase.
+## IO compatibility and risks
 
-Wesentliche Risiken: WebGL-Leistung und Speicher auf älteren Android-Geräten,
-Speicherquoten/Browser-Eviction in IndexedDB, Touch-Gesten-Kollisionen mit
-Browsernavigation sowie die deutlich höhere Komplexität echter LDraw-Geometrien
-und IO-Dateien. Ein Desktop-Preview kann reale Android-Hardware nicht ersetzen;
-die Smartphone-Abnahme bleibt ein eigener Gerätetest.
+IO is a separate adapter and must not be conflated with LDR/MPD or internal
+JSON. Compatibility claims require self-authored, legally distributable IO
+fixtures. Container structure, submodels and unknown metadata must be modeled
+explicitly; import/export need separate tests including roundtrips.
+This work was outside the foundation release.
 
-## Implementierter Format-/Geometrieausbau
+Risks include WebGL performance/memory on older Android hardware, IndexedDB
+quotas/eviction, touch-gesture conflicts with browser navigation and the greater
+complexity of real LDraw geometry and IO containers. Desktop preview cannot
+replace physical smartphone acceptance.
 
-Die oben als spätere Erweiterungen beschriebenen Adapter sind inzwischen in
-`features/formats/{internal,ldraw,mpd,io}` implementiert. Import und Export
-bleiben getrennt. Ein begrenzter ZIP32-Leser prüft den IO-Container; der
-LDraw-Parser erhält Untermodellquelle und affine Matrizen. Ein unabhängiger
-Resolver liest zuerst installierte Katalogdateien und bei Bedarf einen
-zusätzlichen geprüften Originalgeometrie-Snapshot, ohne die Paketkataloge
-oder die Studio-Quelldaten zu überschreiben.
+## Implemented format and geometry extension
 
-Abwärtskompatibler Ausbau des internen JSON v1: Das optionale `imported`-Objekt
-ergänzt die bestehenden `bricks`. Es enthält Originalbytes, Untermodellabschnitte,
-aufgelöste Instanzen mit 3×4-Matrizen in LDU, getrennte Kennungen, Hinweise,
-Geometrie-Ressourcen und Rechtstexte. Keine IndexedDB-Schemamigration ist dafür
-nötig. Historische v1-Projekte ohne dieses Feld bleiben unverändert gültig.
-Importierte Instanzen sind zunächst schreibgeschützt; sie durchlaufen nicht
-das bestehende Snap-/Y-Vierteldrehungsmodell der Baukastensteine.
+The adapters originally described as future work now exist in
+`features/formats/{internal,ldraw,mpd,io}`. Import/export remain separate.
+A bounded ZIP32 reader checks IO containers; the LDraw parser retains submodel
+source and affine matrices. An independent resolver uses installed catalog
+files first and, when needed, an additional reviewed original-geometry snapshot,
+without overwriting package catalogs or Studio source data.
 
-Die Engine gruppiert importierte Flächen nach Teil/Farbe als InstancedMeshes,
-trianguliert Originalflächen und rendert sie auch im Canvas-Fallback.
-Die Darstellung rechnet 20 LDU in eine Noppe um und invertiert die Y-Achse;
-Originalmatrizen werden nicht verändert. Kamera und Anzeigehöhe werden an
-das importierte Modell angepasst.
+Backward-compatible JSON v1 extension: optional `imported` data accompanies the
+existing `bricks`. It contains original bytes, submodel sections, resolved
+instances with 3×4 matrices in LDU, separate identifiers, issues, geometry
+resources and legal documents. No IndexedDB schema migration is needed.
+Historical v1 projects without that field remain valid. Imported instances
+are initially read-only, outside the builder bricks' snapping/Y-quarter-turn
+model.
 
-Die Importvorschau schreibt nichts in die Datenbank. Die Bestätigung legt
-vorheriges Projekt, neues Projekt und aktiven Projektverweis in **einer**
-IndexedDB-Transaktion ab. Erst danach wird der Editor umgeschaltet.
-Projektdateien tragen ihre Ressourcen für das Offline-Wiederöffnen selbst.
+The engine groups imported surfaces by part/color into InstancedMeshes,
+triangulates original faces and also renders them in the Canvas fallback.
+Display conversion uses 20 LDU per stud and an inverted Y axis; source matrices
+are unchanged. Camera and display height adapt to the imported model.
 
-Tatsächlicher Kompatibilitätsstand, Tests und ausdrücklich nicht unterstützte
-Eigenschaften stehen im README und in der IO-Referenzanalyse.
+Import preview writes nothing to the database. Confirmation saves the previous
+project, new project and active-project pointer in **one** IndexedDB transaction.
+Only then does the editor switch projects. Project data carries its resources
+for offline reopening.
 
-## Historischer Stand Phase 1
-
-Die Basisversion und die lokale LDraw-Paketbibliothek sind implementiert.
-Funktionen, Prüfergebnisse und bekannte Grenzen stehen in `README.md`.
-BrickLink-Daten und alle externen Modellformate bleiben außerhalb dieses
-Ausbaus; es wird dafür keine Kompatibilität behauptet.
+The README and [IO reference analysis](io-reference-analysis.md) document actual
+compatibility, tests and unsupported features. The foundation and local package
+library are implemented; only explicitly documented subsets of BrickLink data
+and external formats are supported.

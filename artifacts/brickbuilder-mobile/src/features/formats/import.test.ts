@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { webcrypto } from "node:crypto";
 import { gunzipSync } from "fflate";
@@ -18,8 +19,11 @@ import manifest from "./geometry-manifest.json";
 
 const encode = (s: string) => new TextEncoder().encode(s);
 const ref = "1 4 10 20 30 1 0 0 0 1 0 0 0 1 3001.dat";
+const privateReference = new URL("../../../../../attached_assets/ford_mxCopy_Copy-1_1793477649199.io", import.meta.url);
+// Use a part in the reviewed import snapshot; 3001 requires the optional bricks package.
+const syntheticIO = () => writeZip({ "model.ldr": encode(`0 FILE main.ldr\n${ref.replace("3001.dat", "11211.dat")}`) });
 async function referenceBytes() {
-  return new Uint8Array(await readFile(new URL("../../../../../attached_assets/ford_mxCopy_Copy-1_1793477649199.io", import.meta.url)));
+  return new Uint8Array(await readFile(privateReference));
 }
 describe("bounded ZIP and model parser", () => {
   it("roundtrips stored/deflated data and rejects corrupt CRC, encryption and unsafe paths", () => {
@@ -62,7 +66,7 @@ describe("bounded ZIP and model parser", () => {
   });
 });
 
-describe("real private Studio reference, geometry, formats and storage", () => {
+describe("geometry, formats and storage (private-reference cases are optional)", () => {
   beforeEach(async () => {
     await builderDatabase.open();
     const bytes = await readFile(new URL(`../../../public/${manifest.url}`, import.meta.url));
@@ -86,7 +90,7 @@ describe("real private Studio reference, geometry, formats and storage", () => {
     }
     expect(snapshot.legalDocuments).toHaveLength(2);
   });
-  it("imports exactly 429 instances, 74 references, eight effective colors and real recursive geometry", async () => {
+  it.skipIf(!existsSync(privateReference))("imports the optional private reference with 429 instances, 74 references and eight effective colors", async () => {
     const bytes = await referenceBytes();
     const doc = await importIO(bytes, "ford.io");
     const model = doc.imported!;
@@ -118,7 +122,7 @@ describe("real private Studio reference, geometry, formats and storage", () => {
     await saveProject(previous);
     await expect(importIO(encode("broken"), "bad.io")).rejects.toThrow();
     expect((await loadCurrentProject())?.id).toBe(previous.id);
-    const imported = await importIO(await referenceBytes(), "ford.io");
+    const imported = await importIO(syntheticIO(), "synthetic.io");
     const fail = vi.spyOn(builderDatabase.metadata, "put").mockRejectedValueOnce(new Error("quota"));
     await expect(createImportedProject(previous, imported)).rejects.toThrow("quota");
     expect(await loadProject(imported.id)).toBeNull();
@@ -161,7 +165,23 @@ describe("real private Studio reference, geometry, formats and storage", () => {
     const reopened = importInternal(exportInternal(doc));
     expect(reopened.imported?.instances[0].part).toEqual(doc.imported?.instances[0].part);
   });
-  it("separates internal JSON/LDR/MPD/minimal IO adapters and roundtrips actual fixture transforms", async () => {
+  it("roundtrips a self-authored model through JSON/LDR/MPD/minimal IO without private uploads", async () => {
+    const doc = await importIO(syntheticIO(), "synthetic.io");
+    expect(doc.imported?.instances).toHaveLength(1);
+    expect(doc.imported?.instances[0].part.status).toBe("resolved");
+    expect(compilePart(doc.imported!, "11211.dat", "4").length).toBeGreaterThan(0);
+    const expected = doc.imported!.instances.map(i => [i.reference, i.colorCode, i.matrix]);
+    const json = importInternal(exportInternal(doc));
+    expect(json.imported?.resources).toEqual(doc.imported?.resources);
+    expect(json.imported?.instances.map(i => [i.reference, i.colorCode, i.matrix])).toEqual(expected);
+    expect(parseLDraw(new TextDecoder().decode(exportLDR(doc))).instances.map(i => [i.reference, i.colorCode, i.matrix])).toEqual(expected);
+    expect(new TextDecoder().decode(exportMPD(doc))).toBe(doc.imported?.sourceText);
+    const io = await importIO(exportIO(doc), "synthetic-roundtrip.io");
+    expect(io.imported?.instances.map(i => [i.reference, i.colorCode, i.matrix])).toEqual(expected);
+    expect(() => importInternal(encode('{"schemaVersion":2}'))).toThrow();
+    expect(() => importInternal(encode(JSON.stringify({ ...createEmptyDocument(), bricks: [{ type: "fake" }] })))).toThrow();
+  });
+  it.skipIf(!existsSync(privateReference))("roundtrips the optional private reference through all format adapters", async () => {
     const doc = await importIO(await referenceBytes(), "ford.io");
     doc.metadata = { extra: { retained: true } };
     const json = importInternal(exportInternal(doc));

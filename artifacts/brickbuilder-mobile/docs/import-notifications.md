@@ -1,29 +1,27 @@
-# Benachrichtigungen bei fehlenden Teilen
+# Missing-parts notifications
 
-Bei IO-, LDR-, MPD- und internen JSON-Importen werden erkennbare Teilreferenzen
-mit fehlender oder ungültiger Geometrie als direkt sichtbare
-In-App-Benachrichtigung angezeigt:
+For IO, LDR, MPD and internal JSON imports, recognizable part references with
+missing or invalid geometry are shown in a directly visible in-app notification:
 
-- In der Dateivorschau vor dem Anlegen des Projekts.
-- Im Editor nach erfolgreichem Anlegen sowie beim erneuten Öffnen des Projekts.
-- Mit LDraw-Teilenummer, betroffener Stückzahl und Fehlerursache.
-- Zusätzlich mit BrickLink-Teilenummer, sofern diese ausdrücklich zugeordnet ist.
+- In the file preview before creating a project.
+- In the editor after successful creation and when reopening the project.
+- With LDraw part number, affected count and failure reason.
+- Also with the BrickLink part number if explicitly mapped.
 
-Mehrfach vorkommende Teile werden nach Referenz zusammengefasst. Die Liste ist
-auf kleinen Bildschirmen scrollbar. Die Meldung verschwindet nicht automatisch;
-im Editor kann sie geschlossen werden. Beim erneuten Öffnen oder Neuladen
-erscheint sie wieder, solange das Projekt fehlende Geometrien enthält.
+Repeated parts are grouped by reference. The list scrolls on small screens.
+The notification does not disappear automatically; it can be dismissed in the
+editor. Reopening or reloading shows it again while the project still contains
+missing geometry.
 
-Eine fehlende BrickLink-Zuordnung oder eine unbekannte Farbe bedeutet nicht,
-dass das Teil nicht importiert wurde. Diese Hinweise bleiben im ausführlichen
-Importbericht und werden nicht als fehlgeschlagene Teilegeometrie gemeldet.
+A missing BrickLink mapping or unknown color does not mean a part failed to
+import. Those issues remain in the detailed import report and are not reported
+as failed part geometry.
 
-Die zugrunde liegenden Referenzen und Quelldaten werden weder gelöscht noch
-durch andere Steine ersetzt. Diese Änderung lädt fehlende Geometrien nicht
-automatisch nach. Eine vollständig unlesbare Datei liefert weiterhin einen
-Dateifehler; ohne auslesbare Referenzen können keine Teilenummern genannt werden.
+Underlying references and source data are neither deleted nor replaced with
+other bricks. This feature does not automatically download missing geometry.
+A completely unreadable file still produces a file error; part numbers cannot
+be listed without readable references.
 
-Die automatisierten DOM-Tests prüfen sichtbare IDs, Zusammenfassung, Ursachen,
-Schließen, erneutes Anzeigen und sicheres Anzeigen als Text. Die Meldung ist
-für Screenreader als Alarm ausgezeichnet. Ein physischer Android-Gerätetest
-dieser Meldungen ist noch nicht erfolgt.
+Automated DOM tests check visible IDs, grouping, reasons, dismissal, reappearance
+and safe text rendering. The notification is marked as an alert for screen
+readers. These notifications have not yet been tested on physical Android hardware.

@@ -1,53 +1,47 @@
-# Ältere verschlüsselte Studio-IO-Dateien
+# Older encrypted Studio IO files
 
-## Reproduzierter Fehler
+## Reproduced failure
 
-Die private Nutzerdatei `attached_assets/40649-size_1793502923137.io`
-ist ein ZIP32-Archiv mit 122 Einträgen, rund 4,6 MiB komprimiert und
-22.599.896 Bytes angegebener entpackter Gesamtgröße.
-Studio nennt darin Version `2.23.5_1`.
+The private user file `attached_assets/40649-size_1793502923137.io` is a ZIP32
+archive with 122 entries, about 4.6 MiB compressed and 22,599,896 declared
+uncompressed bytes in total. Its metadata identifies Studio `2.23.5_1`.
 
-Die Einträge sind traditionell PKZIP-verschlüsselt. Der bisherige Reader
-lehnte diese Variante ab. Außerdem überschreitet `model2.ldr` mit
-17.776.068 Bytes das bisher für jeden Eintrag angewandte 16-MiB-Limit,
-obwohl diese zusätzliche Studio-Geometrie nicht ausgewertet werden muss.
+Entries use traditional PKZIP encryption, which the previous reader rejected.
+Also, `model2.ldr` is 17,776,068 bytes, exceeding the 16-MiB limit previously
+applied to every entry, although that additional Studio geometry need not be read.
 
-## Änderung
+## Implementation
 
-- Der IO-Adapter unterstützt zusätzlich die dokumentierte feste
-  Studio-Formatverschlüsselung; keine Passwortsuche oder Benutzerzugangsdaten.
-- Die verwendete Formatkonvention ist öffentlich dokumentiert:
+- The IO adapter additionally supports the documented fixed Studio format
+  encryption; no password search or user credentials.
+- The format convention is publicly documented:
   <https://wiki.ldraw.org/wiki/IO>.
-- Alle ZIP-Namen, lokalen Köpfe, Bereiche und Gesamtgrößen werden geprüft.
-- Nur `model.ldr` wird entschlüsselt und entpackt. Dessen tatsächliche Größe
-  und CRC werden geprüft; Ausgabepuffer bleiben begrenzt.
-- Alle weiteren Einträge verbleiben unverändert im Originalupload.
-  Sie werden weder ausgeführt noch in die lizenzierte Teilebibliothek kopiert.
-- Normale ZIP-Nutzung außerhalb des IO-Adapters akzeptiert weiterhin keine
-  verschlüsselten Archive.
+- All ZIP names, local headers, ranges and total sizes are validated.
+- Only `model.ldr` is decrypted/decompressed. Actual size and CRC are checked;
+  output buffers remain bounded.
+- Other entries stay unchanged in the original upload. They are neither
+  executed nor copied into the licensed parts library.
+- General ZIP use outside the IO adapter still rejects encrypted archives.
 
-## Tatsächlicher Teststand
+## Actual verification
 
-Der Import der privaten Datei wird lokal als Regressionstest ausgeführt,
-sofern sie vorhanden ist. Dieser Test liest 8.590 aufgelöste Typ-1-
-Teilinstanzen mit 517 unterschiedlichen externen Referenzen und prüft,
-dass der Originalupload unverändert erhalten bleibt.
+The private import regression runs locally only when the upload exists and
+otherwise skips explicitly. It reads 8,590 resolved type-1 instance references
+with 517 distinct external part references and verifies that original upload
+bytes remain unchanged.
 
-Die Studio-Metadaten nennen dagegen 8.586 Teile. Diese Zahl wird nicht
-blind als Parsergebnis übernommen. Das Modell enthält außerdem vier
-rein dreiecksbasiert beschriebene flexible Untermodelle. Der aktuelle Parser
-erhält solche Geometriezeilen nur in der Quelle und meldet sie im Bericht;
-er stellt sie nicht als Flächen dar.
+Studio metadata instead reports 8,586 parts. That value is not blindly adopted
+as the parser result. The model also contains four flexible submodels described
+only with triangles. The current parser preserves those geometry lines in the
+source and reports them, but does not render them as surfaces.
 
-Der gebündelte Geometriebestand deckt nur einen Teil der 517 Referenzen ab.
-Installierte Teilepakete können den verfügbaren Bestand erweitern.
-Fehlende Standardteile werden mit Referenz und Stückzahl als Benachrichtigung
-angezeigt; unbestätigte Farbzuordnungen behalten ihre bisherigen Warnungen.
-Eine vollständige oder visuell Studio-identische Darstellung dieser Datei
-ist daher **nicht** nachgewiesen.
+The bundled geometry dataset covers only some of the 517 references.
+Installed packages can extend the available resources. Missing standard parts
+are shown in a notification with reference/count; unconfirmed color mappings
+retain their warnings. Complete rendering or visual equivalence with Studio
+has therefore **not** been demonstrated.
 
-Zusätzlich testen selbst erstellte, unabhängig mit Info-ZIP verschlüsselte
-Text-Fixtures gespeicherte und DEFLATE-komprimierte Einträge, einen falschen
-Schlüssel, beschädigte Daten, Größenabweichungen und das Überspringen großer,
-nicht benötigter Ressourcen. Diese Fixtures enthalten keine privaten Modelle.
-Ein physischer Android-Test steht aus.
+Independent self-authored text fixtures encrypted with Info-ZIP test stored
+and DEFLATE-compressed entries, a wrong key, corrupt data, size discrepancies
+and skipping large unused resources. These contain no private models and run
+without uploads. A physical Android test remains outstanding.

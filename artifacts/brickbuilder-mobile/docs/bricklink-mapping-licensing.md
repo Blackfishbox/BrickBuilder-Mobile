@@ -1,29 +1,27 @@
-# BrickLink-Teilenummern: Nachweis und Lizenz
+# BrickLink part numbers: evidence and licensing
 
-## Getrennter Datenbestand
+## Separate dataset
 
-`ldraw-explicit-bricklink`, Version `2026-10-31.1`, wird unabhängig von
-App-Code und Geometrie versioniert. Die acht Datensätze sind eine bearbeitete
-Auswahl aus ausdrücklich genannten `0 !KEYWORDS BrickLink …`-Zeilen der
-offiziellen LDraw-Dateien, keine BrickLink-Katalogkopie oder Studio-Datenbank.
-Extraktion, Namens-Leerraumnormalisierung und Variantenhinweise: BrickBuilder.
-Namen sind **LDraw-Beschreibungen**, keine bestätigten BrickLink-Katalognamen.
-Es werden keine Marktpreise oder Live-Verfügbarkeiten abgerufen.
+`ldraw-explicit-bricklink`, version `2026-10-31.1`, is versioned independently
+of app code and geometry. Its eight records are an edited selection of explicit
+`0 !KEYWORDS BrickLink …` lines in official LDraw files, not a copy of the
+BrickLink catalog or Studio database. Extraction, name whitespace normalization
+and variant notes: BrickBuilder. Names are **LDraw descriptions**, not confirmed
+BrickLink catalog names. No market prices or live availability are fetched.
 
-Die Auswahl und abgeleiteten Beschreibungen stehen unter **CC BY 4.0**:
+The selection and derived descriptions are licensed under **CC BY 4.0**:
 https://creativecommons.org/licenses/by/4.0/
-Die Lizenz gilt für diesen Datenbestand, nicht automatisch für App-Code.
-Die Autoren sind pro Datensatz erhalten. Die vollständigen Originaldateien
-mit Historien sowie `CAreadme.txt` und `CAlicense4.txt` liegen im bereits
-ausgelieferten, hashgebundenen Import-Geometriepaket. Der Importbericht
-speichert Autoren, Quellen-URLs, unveränderte Belegzeilen, SHA-256 der
-Originaldateien, Lizenz, Datenbestands-ID und Version direkt im Projekt.
-Die URLs können sich künftig ändern; maßgeblich ist der geprüfte Snapshot.
-Keine Bestätigung oder Empfehlung durch LDraw, BrickLink oder LEGO behauptet.
+This license covers the dataset, not automatically the app code.
+Authors are retained per record. Complete original files with histories,
+`CAreadme.txt` and `CAlicense4.txt` are in the shipped, hash-pinned import
+geometry package. The import report stores authors, source URLs, verbatim
+evidence lines, original-file SHA-256, license, dataset ID and version in the
+project. URLs may change; the reviewed snapshot is authoritative.
+No endorsement by LDraw, BrickLink or LEGO is claimed.
 
-## Belegte Auswahl
+## Evidenced selection
 
-| LDraw | BrickLink | LDraw-Beschreibung / Variante |
+| LDraw | BrickLink | LDraw description / variant |
 | --- | --- | --- |
 | 3023a | 3023old | Plate 1 x 2 with Flat Pin |
 | 3023b | 3023 | Plate 1 x 2 |
@@ -34,29 +32,27 @@ Keine Bestätigung oder Empfehlung durch LDraw, BrickLink oder LEGO behauptet.
 | 6141 | 4073 | Plate 1 x 1 Round |
 | 73587p01 | 4592c02 | Hinge Control Stick Base with Black Control Stick |
 
-Jeder Nachweis verlinkt auf
+Each record links to
 `https://library.ldraw.org/library/official/parts/<LDraw-ID>.dat`.
-Die Hashes und Autoren werden automatisiert gegen den vorhandenen Snapshot
-geprüft. Dieser erste Bestand belegt **8 der 74** unterschiedlichen
-Referenzteile; die übrigen **66 bleiben unbestätigt**, auch wenn Nummern
-zufällig gleich aussehen. Studio-IDs bleiben vollständig unbestätigt.
+Hashes and authors are tested against the existing snapshot. This initial
+dataset verifies **8 of 74** distinct reference parts; the remaining **66 stay
+unconfirmed**, even if their numbers look identical. All Studio IDs remain
+unconfirmed.
 
-## Konflikte, Pakete und Wiederöffnen
+## Conflicts, packages and reopening
 
-Nur Groß-/Kleinschreibung und `.dat` werden normalisiert; Suffixe,
-Baugruppen, Drucke und Pfade nicht zusammengelegt. Gleiche BrickLink-ID aus
-mehreren Nachweisen ist keine Mehrdeutigkeit; unterschiedliche IDs für die
-exakt gleiche LDraw-Referenz sind es. Alle Kandidaten bleiben sichtbar,
-ohne erste Quelle oder Installationsreihenfolge zu bevorzugen.
-Geometrieauflösung und Nummernzuordnung sind voneinander unabhängig.
+Only letter case and `.dat` are normalized; suffixes, assemblies, prints and
+paths are not merged. Multiple records with the same BrickLink ID do not imply
+ambiguity; different IDs for the exact same LDraw reference do. All candidates
+stay visible without preferring the first source or installation order.
+Geometry resolution and ID mapping are independent.
 
-Installierbare Bibliothekspakete können das optionale `mappings`-Feld der
-bestehenden `LibraryPart`-Schnittstelle verwenden. Die Paketprüfung verlangt
-den exakten Original-Keyword, Autor, Lizenz, URL und Quellenhash; unbelegte
-alte `brickLinkId`-Felder werden nicht als Nachweis übernommen.
-Dieser Bestand wird gebündelt und benötigt keinen eigenen Netzabruf.
+Installable library packages can use the existing `LibraryPart` interface's
+optional `mappings` field. Validation requires the exact original keyword,
+author, license, URL and source hash; old unsubstantiated `brickLinkId` fields
+are not accepted as evidence. The dataset is bundled and needs no separate
+network request.
 
-JSON-Sicherung, Autosave und Wiederöffnen erhalten den verwendeten
-Nachweisstand und Konflikte offline. Bestehende Projekte werden nicht
-nachträglich mit neuen Zuordnungen umgeschrieben; ein erneuter Quellenimport
-verwendet den aktuellen Bestand.
+JSON backup, autosave and reopening retain the evidence version and conflicts
+offline. Existing projects are not retroactively rewritten with new mappings;
+a new source import uses the current dataset.

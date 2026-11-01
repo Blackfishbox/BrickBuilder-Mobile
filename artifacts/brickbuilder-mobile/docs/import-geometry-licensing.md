@@ -1,41 +1,38 @@
-# Geometriesnapshot für den Modellimport
+# Geometry snapshot for model import
 
-Der zusätzliche Snapshot `public/parts/import-geometry-2026-10-31.bin`
-enthält ausschließlich 74 offizielle LDraw-Hauptteile und deren rekursive
-Abhängigkeiten, insgesamt 321 Dateien. Er ist unabhängig von den bereits
-installierbaren Katalogpaketen und verändert deren Schnittstellen nicht.
-Keine eingebetteten Studio-Dateien werden daraus übernommen.
+The additional `public/parts/import-geometry-2026-10-31.bin` snapshot contains
+only 74 official LDraw main parts and their recursive dependencies: 321 files
+in total. It is independent of the installable catalog packages and does not
+change their interfaces. No embedded Studio files are copied into it.
 
-Quelle: <https://library.ldraw.org/library/updates/complete.zip>
-(offizieller Bestand, abgerufen 2026-10-31). Originaldatei-URLs, Autoren und
-Lizenzangaben sind pro Datei im Snapshot enthalten, zusammen mit
-`CAreadme.txt` und `CAlicense4.txt`.
+Source: <https://library.ldraw.org/library/updates/complete.zip>
+(official library, retrieved 2026-10-31). Original file URLs, authors and
+license information are included per file, together with `CAreadme.txt` and
+`CAlicense4.txt`.
 
-Jede Datei wurde auf einen expliziten CC-BY-4.0-, dualen
-CC-BY-2.0-und-CC-BY-4.0- oder CC0-Header und LDraw-Org-Header geprüft.
-Bei dualen Headern wird die angebotene CC-BY-4.0-Lizenz verwendet.
-Sämtliche Originalheader, Credits und History bleiben unverändert erhalten.
-Änderungen durch BrickBuilder: Auswahl, gzip-Paketierung und Suchmetadaten,
-keine Änderung der Original-LDraw-Dateiinhalte.
+Every file was checked for an explicit CC-BY-4.0, dual CC-BY-2.0-and-CC-BY-4.0,
+or CC0 header and an LDraw-Org header. For dual headers, the offered CC-BY-4.0
+license is used. Original headers, credits and history remain unchanged.
+BrickBuilder changes: selection, gzip packaging and search metadata, not
+original LDraw file content.
 
-SHA-256 des komprimierten Snapshots:
+Compressed snapshot SHA-256:
 `3611c261dc046428a019a0625bea3d7156d73de2244d9fe92413908e06dbaf6f`.
-Größe: 98.923 Bytes. Die Anwendung prüft Hash und Bytezahl beim Download.
-Die Endung `.bin` ist beabsichtigt: gzip ist das interne Paketformat, nicht
-HTTP-Content-Encoding. Automatische HTTP-Dekompression würde die Prüfsumme
-der über `fetch` gelesenen Bytes verändern.
-Der Snapshot wird bewusst erzeugt, nie automatisch beim App-Build aktualisiert.
-Das explizite Wartungsskript unterstützt ein lokal heruntergeladenes offizielles
-Archiv über `LDRAW_ARCHIVE`, um viele einzelne Requests zu vermeiden.
+Size: 98,923 bytes. The app checks both hash and byte length on download.
+The `.bin` extension is intentional: gzip is the internal package format,
+not HTTP Content-Encoding. Automatic HTTP decompression would change the
+checksum of bytes read by `fetch`.
+The snapshot is deliberately generated, never automatically updated during
+app builds. The explicit maintenance script accepts a locally downloaded
+official archive via `LDRAW_ARCHIVE` to avoid many individual requests.
 
-Geometrien, Autoren und Rechtstexte bleiben nach Import lokal im Projekt.
-JSON-Sicherungen erhalten sie ebenfalls. LDR/MPD/minimaler IO-Export referenzieren
-die Bibliotheksdateien und enthalten keine eingebetteten Geometriekopien.
-Die Nutzerdatei selbst wird ausschließlich als private Referenz gelesen und
-nicht in den öffentlichen Snapshot oder Build aufgenommen.
+Geometry, authors and legal documents remain in the local project after import,
+including JSON backups. LDR/MPD/minimal IO export references library files
+without embedding geometry copies. The user's file is read only as a private
+reference and is not included in the public snapshot or build.
 
-Farbnamen und RGB-Werte sind ein expliziter Ausschnitt aus LDConfig.ldr.
-Die getrennten BrickLink-Farbnummern sind im Farbresolver mit Herkunftslink
-und Prüfstand dokumentiert. Es gibt keine implizite Nummerngleichsetzung.
+Color names and RGB values are an explicit subset of LDConfig.ldr.
+Separate BrickLink color numbers are documented in the color resolver with
+source links and review date. Number equality is never inferred.
 
-Dies dokumentiert eine technische Herkunfts-/Lizenzprüfung, keine Rechtsberatung.
+This documents a technical provenance/license review, not legal advice.

@@ -1,19 +1,19 @@
-# IO-Referenzanalyse
+# IO reference analysis
 
-## Quelle und Grenzen
+## Source and limits
 
-Die vom Nutzer bereitgestellte Datei liegt unter
+The user-supplied file is locally available at
 `attached_assets/ford_mxCopy_Copy-1_1793477649199.io`.
 SHA-256: `ef2c06d4ced5bb56b3ff3bc91fb18274dfc0e84133055bc4d93fd048585f0c14`.
+It is not distributed with the source repository.
 
-Diese Analyse prüft die Archivstruktur und Modelldaten, nicht die fertige
-Importfunktion oder die visuelle Übereinstimmung in BrickBuilder.
-Sie belegt keine allgemeine IO-Kompatibilität.
+The original analysis checks archive structure and model data, not the finished
+import function or visual equivalence in BrickBuilder. It does not demonstrate
+general IO compatibility. Later adapter verification is described separately below.
 
 ## Container
 
-Unverschlüsseltes ZIP-Archiv mit acht Einträgen und insgesamt 1.422.568
-unkomprimierten Bytes:
+An unencrypted ZIP archive with eight entries and 1,422,568 uncompressed bytes:
 
 - `model.ldr`
 - `model.lxfml`
@@ -24,23 +24,22 @@ unkomprimierten Bytes:
 - `errorPartList.err`
 - `.info`
 
-`.info` nennt Studio-Version `2.26.3_1`, Teilezahl 429 und
-Teiledatenbank-Version 212.
+`.info` lists Studio version `2.26.3_1`, part count 429 and parts database
+version 212.
 
-## Modellreferenz
+## Model reference
 
-`model.ldr` enthält neun FILE-Abschnitte: ein Hauptmodell und acht Untermodelle.
-Die Datei hat 402 rohe Typ-1-Referenzzeilen. Rekursives Auflösen der vom
-Hauptmodell referenzierten Untermodelle ergibt:
+`model.ldr` contains nine FILE sections: one main model and eight submodels,
+with 402 raw type-1 reference lines. Recursively resolving the main model gives:
 
-- 429 Teileinstanzen
-- 74 unterschiedliche externe Teilreferenzen
-- acht effektive Farbcodes nach Vererbung von Farbe 16
+- 429 part instances.
+- 74 distinct external part references.
+- Eight effective color codes after inheriting color 16.
 
-Die ermittelte Instanzenzahl entspricht der Studio-Teilezahl aus `.info`.
-Die 74 Teilreferenzen sind keine bestätigten BrickLink-IDs.
+The resulting count matches Studio's `.info` part count.
+The 74 references are not confirmed BrickLink IDs.
 
-| Quellfarbcode in model.ldr | Instanzen |
+| Source color code in model.ldr | Instances |
 | --- | ---: |
 | 0 | 305 |
 | 72 | 68 |
@@ -51,109 +50,103 @@ Die 74 Teilreferenzen sind keine bestätigten BrickLink-IDs.
 | 179 | 4 |
 | 47 | 13 |
 
-Diese Nummern nicht unverändert als BrickLink-Farbkennungen interpretieren.
-Die Zuordnung braucht eine nachvollziehbare, getrennte Farbtabelle.
+Do not interpret these numbers directly as BrickLink color IDs; mapping needs
+a traceable separate color table.
 
-## Anforderungen an den Import
+## Import requirements
 
-1. Untermodellreferenzen mit Namen einschließlich Leerzeichen auflösen,
-   Zyklenerkennung und Begrenzungen für Tiefe und Instanzen vorsehen.
-2. Vollständige affine Transformationsmatrizen erhalten. Neun rohe
-   Referenzzeilen enthalten Matrixwerte außerhalb einfacher Achsenrotationen;
-   das bisherige Modell aus Position und Y-Vierteldrehung reicht nicht aus.
-3. Die Quelleinheiten getrennt von den internen Baueinheiten umrechnen.
-4. Unaufgelöste Teile und Farben sichtbar melden und ihre Quelldaten erhalten.
-   Keine stillen Ersatzsteine und kein Verwerfen unbekannter Teile.
-5. Den bisherigen lokalen Projektbestand und Autosave vor Importfehlern
-   schützen. Erst nach erfolgreicher Validierung ein neues Projekt anlegen.
-6. ZIP-Einträge vor dem Lesen auf Größen, Pfade und unterstützte Kodierung
-   prüfen. Keine Extraktion über das Projektdateisystem.
+1. Resolve submodels with names containing spaces, detecting cycles and limiting
+   depth/instance expansion.
+2. Preserve full affine transformation matrices. Nine raw reference lines have
+   values beyond simple axis rotations; position plus Y-quarter-turns is insufficient.
+3. Convert source units separately from internal building units.
+4. Visibly report unresolved parts/colors while preserving source data.
+   No silent substitute bricks or dropped unknown references.
+5. Protect existing projects and autosave from import errors. Create a new
+   project only after successful validation.
+6. Check ZIP sizes, paths and supported encoding before reading; no filesystem
+   extraction.
 
-## Zusätzliche Einträge
+## Additional entries
 
-`modelv2.ldr` enthält unter anderem Studio-spezifische Typ-11-Zeilen und ist
-nicht wie normales LDraw mit Typ-1-Referenzen auszuwerten.
+`modelv2.ldr` includes Studio-specific type-11 lines and cannot be interpreted
+as ordinary type-1 LDraw references.
 
-`model2.ldr` enthält 270 FILE-Abschnitte, darunter eingebettete
-Teil-/Primitivdefinitionen, und andere Farbnummern als `model.ldr`.
-Diese eingebetteten Ressourcen nicht in die allgemeine Teilebibliothek
-übernehmen oder als neue, frei verteilbare LDraw-Ressourcen behandeln.
-Für die Teilebibliothek ausschließlich gesondert lizenzierte Quellen verwenden.
+`model2.ldr` has 270 FILE sections, including embedded part/primitive definitions,
+and different color numbers from `model.ldr`. Do not copy these embedded
+resources into the general parts library or treat them as freely redistributable
+LDraw data. Use separately licensed sources for the library.
 
-`model.lxfml` enthält 422 Part-Elemente und ist daher ohne weitere
-Formatkenntnis kein Ersatz für die rekursive Teilezählung aus `model.ldr`.
-`model.ins` ist XML mit Instruction-Wurzel; `.info` ist JSON.
-Zusatzdaten möglichst unverändert als Quelldaten erhalten, aber nicht als
-bereits unterstützte Bearbeitungsfunktionen ausgeben.
+`model.lxfml` has 422 Part elements and is not a substitute for recursive
+`model.ldr` counting without additional format knowledge.
+`model.ins` is XML with an Instruction root; `.info` is JSON.
+Retain extra data unchanged where possible, without claiming supported editing
+features for it.
 
-## Nachweis im implementierten Adapter
+## Implemented adapter verification
 
-Der automatisierte Referenztest liest die private Upload-Datei direkt; sie wird
-nicht als öffentliche Fixture oder in den App-Build kopiert.
+Private-reference tests read the local upload directly and skip explicitly when
+it is absent. It is not copied into a public fixture or application build.
+Independent synthetic regressions run without it.
 
-- 429 erhaltene Instanzen, 74 externe Referenzen, neun FILE-Abschnitte.
-- Die oben aufgeführten acht effektiven Farbcodes und Häufigkeiten stimmen.
-- Alle 429 Instanzen verwenden auflösbare Original-LDraw-Geometrien.
-  Ein separater, hashgebundener Snapshot enthält 74 Hauptteile und insgesamt
-  321 geprüfte Originaldateien (98.923 Bytes gzip).
-- Die Geometrien stammen aus der offiziellen LDraw-Bibliothek, nicht aus
-  `model2.ldr`. Unterteil- und Primitivreferenzen werden rekursiv aufgelöst.
-- Vollständige 3×4-Matrizen inklusive Spiegelung, Skalierung und Scherung bleiben
-  erhalten. Einheiten: 20 LDU = eine Noppe; Y wird für die Anzeige invertiert.
-- JSON-Sicherung und lokales Wiederöffnen erhalten Originalarchiv, Untermodelle,
-  Matrizen, Ressourcen, Lizenztexte und Hinweise ohne weiteren Download.
-- Die acht LDraw-Farben haben ausdrücklich getrennte BrickLink-Farbzuordnungen;
-  nicht bestätigte BrickLink- und Studio-Teilenummern bleiben leer.
-- Beschädigte Archive, unsichere Pfade, Zyklen, ungültige Matrizen und simulierte
-  Speicherfehler sind geprüft. Fehlgeschlagene Transaktionen ändern weder
-  bestehende Projekte noch den aktiven Projektverweis.
-- LDR-Export erhält die aufgelösten Matrizen/Farben, MPD die unveränderte
-  Untermodellquelle, solange keine Baukastensteine ergänzt wurden. Minimaler
-  IO-Export wird im eigenen Importer wieder eingelesen; dies ist **kein Nachweis
-  des Öffnens in BrickLink Studio**.
+- 429 retained instances, 74 external references, nine FILE sections.
+- The eight effective color codes/counts above match.
+- All 429 instances have resolvable original LDraw geometry. A separate,
+  hash-pinned snapshot has 74 main parts / 321 reviewed original files
+  (98,923 gzip bytes).
+- Geometry comes from the official LDraw library, not `model2.ldr`.
+  Subparts/primitives resolve recursively.
+- Full 3×4 matrices, including reflection, scaling and shear, remain intact.
+  Display conversion: 20 LDU = one stud, with Y inverted.
+- JSON backups and local reopening retain the original archive, submodels,
+  matrices, resources, legal texts and issues without another download.
+- The eight LDraw colors have explicitly separate BrickLink mappings.
+  Unconfirmed BrickLink/Studio part IDs remain empty.
+- Tests cover damaged archives, unsafe paths, cycles, invalid matrices and
+  simulated storage failure. Failed transactions change neither existing
+  projects nor the active-project pointer.
+- LDR export retains resolved matrices/colors; MPD retains unchanged submodel
+  source while no builder bricks have been added. Minimal IO export is read
+  back by our importer; this is **not evidence of opening it in BrickLink Studio**.
 
-## Visuelle und fachliche Grenzen
+## Visual and domain limitations
 
-Im mobilen Browserablauf (402×874) wurde das zusammengesetzte Auto sichtbar
-gerendert. Die Vorschau meldete 429/74/8 und ausschließlich die erwarteten
-Hinweise zu unbestätigten BrickLink-Teilenummern und zur IO-Unterstützungsgrenze.
-Nach Neuladen und erneutem Öffnen bei blockierter Geometrie-Downloadroute
-blieb die Geometrie ohne erneuten Request verfügbar. Ein vorheriges Projekt
-mit einem Stein blieb unverändert erhalten; beschädigter IO-Upload zeigte
-einen Fehler, ohne es zu ersetzen.
+An earlier mobile browser flow (402×874) visibly rendered the assembled car.
+The preview reported 429/74/8 with only expected unconfirmed BrickLink-ID and
+bounded IO-support notices. After reloading/reopening with the geometry download
+route blocked, geometry remained available without another request. An existing
+one-brick project remained unchanged; a corrupt IO upload produced an error
+without replacing it.
 
-Kein visueller Pixel-/Geometrievergleich gegen eine Studio-Referenzansicht:
-eine solche Ansicht wurde nicht mitgeliefert. Keine Behauptung allgemeiner
-IO-Kompatibilität oder physisch korrekter LEGO-Verbindungen.
+There was no pixel/geometry comparison against a Studio reference view because
+none was supplied. This is not a claim of general IO compatibility or physically
+correct LEGO connections.
 
-Die Darstellung unterstützt LDraw-Typen 1–4 (Typ 1 rekursiv, Quads trianguliert).
-Typ-5-Kanten sind nicht implementiert. BFC-Culling wird nicht rekonstruiert;
-Flächen sind doppelseitig, Normale flach pro Dreieck. TEXMAP und Studio-Texturen,
-Materialeffekte wie Metallic/Perlglanz, Anleitungen und proprietäre Zusatzdaten
-sind keine unterstützten Bearbeitungsfunktionen. Transparenz wird angenähert.
-Diese Einschränkungen ändern die erhaltenen Quelldaten nicht.
+Rendering supports LDraw types 1–4 (recursive type 1, triangulated quads).
+Type-5 edges are not implemented. BFC culling is not reconstructed; faces are
+double-sided with flat per-triangle normals. TEXMAP, Studio textures, metallic/
+pearlescent materials, instructions and proprietary extra data are not supported
+editing features. Transparency is approximate. These limits do not modify
+retained source data.
 
-Importierte Instanzen sind als Modellansicht bewusst schreibgeschützt; die
-bisherigen Baukastensteine können daneben weiterhin bearbeitet werden.
-Eine rein visuelle Höhenkorrektur verhindert, dass das Modell unter der
-Grundplatte verschwindet; Quellmatrizen werden dadurch nicht verändert.
+Imported instances are intentionally read-only model views; builder bricks can
+still be edited alongside them. A display-only height correction keeps the
+model above the baseplate without changing source matrices.
 
-Weiter offen bleiben:
+Still outstanding:
 
-- Bestätigung der sichtbaren Übereinstimmung mit Studio.
-- Physischer Android-Abnahmetest einschließlich Flugmodus und Speicherverdrängung.
+- Confirmation of visual equivalence with Studio.
+- Physical Android acceptance, including airplane mode and storage eviction.
 
-## Ergänzung: belegte BrickLink-Teilenummern
+## Addition: evidenced BrickLink part numbers
 
-Der getrennt lizenzierte Zuordnungsbestand `ldraw-explicit-bricklink`
-(`2026-10-31.1`) belegt acht der 74 Referenzteile anhand ausdrücklicher
-BrickLink-Keywords in den geprüften LDraw-Originalen. Die 66 anderen
-Referenzen und sämtliche Studio-IDs bleiben unbestätigt. Die früheren
-Aussagen über vollständig leere BrickLink-Teilenummern beschreiben den
-Stand vor dieser Ergänzung.
+The separately licensed `ldraw-explicit-bricklink` mapping dataset
+(`2026-10-31.1`) verifies eight of the 74 reference parts using explicit BrickLink
+keywords in reviewed LDraw originals. The other 66 references and all Studio
+IDs remain unconfirmed. Earlier statements that all BrickLink part IDs were
+empty describe the state before this addition.
 
-Der Bericht zeigt alle Teil-/Farbkombinationen mit Häufigkeit, Namen,
-Nummern, Varianten, Quellen, Autoren, Lizenz, Quellenhash und Version.
-Widersprüchliche Nachweise ergeben mehrere Kandidaten ohne ausgewählte ID;
-unbekannte Nummern und Originaldaten bleiben erhalten. Details und
-Lizenzabgrenzung: [BrickLink-Zuordnung](bricklink-mapping-licensing.md).
+The report lists part/color combinations with counts, names, IDs, variants,
+sources, authors, license, source hash and version. Conflicting evidence produces
+multiple candidates without a selected ID; unknown IDs and original data are
+retained. See [BrickLink mapping licensing](bricklink-mapping-licensing.md).

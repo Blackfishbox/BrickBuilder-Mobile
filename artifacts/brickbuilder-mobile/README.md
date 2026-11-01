@@ -1,143 +1,136 @@
 # BrickBuilder Mobile
 
-Eigenständige, lokale Bau-App als installierbare PWA. Die erste Version
-konzentriert sich auf die mobile Konstruktion mit drei parametrisierbaren
-Steinformen; sie ist kein Klon von BrickLink Studio und verwendet keine
-proprietären Studio-Ressourcen.
+An independent, local-first, installable building PWA. The initial release
+focused on mobile construction with three parametric brick shapes. This is
+not a BrickLink Studio clone and does not use proprietary Studio resources.
+The application interface is deliberately German; repository-facing material
+is English.
 
-## Phase 1: verfügbar
+For installation, tested tool versions, required variables and deployment,
+see the [root README](../../README.md) and
+[setup and hosting guide](../../docs/setup-and-hosting.md).
 
-- Responsive Oberfläche für Hoch- und Querformat mit Touch-Werkzeugleiste,
-  Steinauswahl, lokaler Suche und Farbauswahl.
-- Interaktive Three.js-Szene mit Grundfläche, Raster, Snapping auf halbe
-  Baueinheiten und prozeduralen 2×4-, 2×2- und 1×2-Steinen.
-- Platzieren, Auswählen, Ziehen, Drehen, Löschen sowie Undo/Redo.
-- Ein-Finger-Kameradrehung; Zwei-Finger-Gesten für Zoom, Drehung und Verschieben.
-- InstancedMesh-Gruppierung nach Typ und Farbe im WebGL2-Modus.
-- 2D-Canvas-Projektionsfallback, falls der Browser keinen WebGL2-Kontext bereitstellt.
-- Lokale Projekte in IndexedDB, automatische Speicherung, Wiederherstellung und
-  Projektwechsel.
-- Manifest und generierter Service Worker; die gebündelte App wird für die
-  Nutzung nach dem ersten Laden vorgemerkt. Ein Modellanalyse-Worker hält
-  Kennzahlen und Überlappungsanalyse aus dem UI-Thread heraus.
-- Keine Konten, Server, externen Schriftarten oder kostenpflichtigen Dienste.
+## Available foundation
 
-## Prüfung
+- Responsive portrait/landscape UI with touch toolbar, brick selection,
+  local search and color selection.
+- Interactive Three.js scene with baseplate, grid, half-unit snapping and
+  procedural 2×4, 2×2 and 1×2 bricks.
+- Place, select, drag, rotate, delete, undo and redo.
+- One-finger camera rotation; two-finger zoom, rotation and panning.
+- InstancedMesh grouping by type/color in WebGL2 mode.
+- 2D Canvas projection fallback when WebGL2 is unavailable.
+- Local IndexedDB projects, autosave, recovery and project switching.
+- Manifest and generated service worker for the bundled app after initial load;
+  a model-analysis worker keeps metrics/overlap analysis off the UI thread.
+- No accounts, required application server, external fonts or paid services.
 
-Im Workspace erfolgreich ausgeführt:
+## Verification and limits
 
 ```sh
 pnpm --filter @workspace/brickbuilder-mobile run typecheck
 pnpm --filter @workspace/brickbuilder-mobile run test
-PORT=23048 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run build
+PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run build
 ```
 
-Die Tests decken Raster/Snapping, Drehungen, Undo/Redo und IndexedDB-Grundlagen
-ab. Der Produktionsbuild erzeugt `manifest.webmanifest` und `sw.js`; die
-Three.js-Engine wird separat und verzögert geladen. Der eigentliche
-Three.js-Chunk ist rund 536 kB unkomprimiert (132 kB gzip), was bei späteren
-Leistungstests auf Android berücksichtigt werden sollte.
+Tests cover grid/snapping, rotations, history, IndexedDB, parts installation,
+format handling and import failures. Private-reference cases skip when their
+local uploads are absent; synthetic regressions still run. The production
+build generates `manifest.webmanifest` and `sw.js`; Three.js is a separate,
+lazy-loaded chunk. Historical foundation measurements put that chunk near
+536 kB uncompressed / 132 kB gzip; measure the current build for deployment.
 
-Die Vorschau wurde bei 402×874 und 844×402 Pixeln geprüft. Die
-Vorschau-Umgebung stellt keinen WebGL2-Kontext bereit und zeigt daher den
-Canvas-Fallback. Ein echtes Android-Smartphone und der WebGL2-Pfad wurden hier
-nicht physisch geprüft. Ebenso steht ein tatsächlicher Flugmodus-Test im
-installierten Browser noch aus; die Offline-Erzeugung und der Cache-Inhalt des
-Produktionsbuilds wurden geprüft, nicht ein vollständiger Offline-Browserlauf.
+Earlier previews were checked at 402×874 and 844×402. The preview environment
+did not expose WebGL2, so it showed the Canvas fallback. No physical Android
+device, physical WebGL2 acceptance or installed-browser airplane-mode test
+has been completed. Generated offline assets/cache contents were checked,
+not a full offline browser acceptance run.
 
-## Modellimport und Dateiformate
+## Model import and file formats
 
-Unter **Projektmenü → Datei importieren / exportieren** lässt sich eine lokale
-IO-, LDR-, MPD- oder JSON-Datei auswählen. Nach der Prüfung zeigt eine Vorschau
-Instanzenzahl, Teile, Farben und Hinweise. Erst **Neues Projekt aus Import
-anlegen** speichert und öffnet ein neues Projekt; das vorherige Modell bleibt
-erhalten. Ein Fehler beim Lesen oder Speichern ersetzt kein bestehendes Projekt.
-Ein Hinweis über dem Modell öffnet den dauerhaft gespeicherten Importbericht.
+In the German UI, use **Projektmenü → Datei importieren / exportieren**
+to select a local IO, LDR, MPD or JSON file. The preview shows instance,
+part and color counts and issues. Only **Neues Projekt aus Import anlegen**
+saves/opens a new project; the previous model is retained. Read/save failures
+do not replace existing projects. A notice above the model opens the saved
+import report.
 
-Mit der bereitgestellten privaten Studio-Datei nachgewiesen: **429 Instanzen,
-74 verschiedene externe Teile und acht effektive Farben**, Untermodelle und
-vollständige affine Transformationen. Alle 74 Original-LDraw-Teilegeometrien
-einschließlich ihrer rekursiven Abhängigkeiten sind renderbar. Diese Dateianalyse
-und die Tests sind kein Versprechen allgemeiner Studio-Kompatibilität.
+The supplied private Studio reference demonstrated **429 instances, 74 distinct
+external parts and eight effective colors**, submodels and full affine
+transforms. All 74 original LDraw part geometries and their recursive
+dependencies can be rendered. This evidence does not establish general Studio
+compatibility.
 
-LDraw- und BrickLink-Farbnummern sowie Namen werden getrennt angezeigt.
-Studio-IDs und nicht bestätigte BrickLink-Teilenummern werden nicht geraten.
-Fehlende Geometrien werden mit Referenz und Anzahl im Bericht ausgewiesen,
-unbekannte Farben mit Warnfarbe Magenta. Keine stillen Ersatzsteine.
+LDraw and BrickLink color IDs/names are separate. Studio IDs and unconfirmed
+BrickLink part IDs are not guessed. Missing geometry is reported by reference
+and count; unknown colors use warning magenta. No silent substitute bricks.
 
-Originalupload, Untermodellquelle, Zusatzdaten im IO-Archiv, verwendete
-LDraw-Dateien, Credits und Lizenztexte werden im lokalen Projekt erhalten.
-Nach erfolgreichem Import benötigt das Wiederöffnen keine Netzwerkverbindung.
-Der zusätzliche Geometriesnapshot wird bei Bedarf beim Import geladen, nicht
-beim App-Start. Das bestehende Paket-/Katalogsystem wird nicht verändert.
-Importierte Instanzen sind schreibgeschützt; Baukastensteine bleiben bearbeitbar.
+Original upload bytes, submodel source, additional IO archive data, LDraw files,
+credits and license texts remain in the local project. After successful
+import, reopening needs no network. The extra reviewed geometry snapshot is
+loaded on demand during import, not at startup, without changing the package
+catalog system. Imported instances are read-only; builder bricks remain editable.
 
-Der mobile Browserablauf wurde mit der echten Referenz geprüft: sichtbares
-zusammengesetztes Auto, Speicherung, Neuladen, erneutes Öffnen ohne
-Geometriedownload sowie unverändertes vorheriges Projekt bei Importfehlern.
-Ein physischer Android-/Flugmodus-Test und ein Vergleich gegen Studio fehlen
-weiterhin.
+The earlier mobile browser flow with the real reference checked a visible
+assembled car, persistence/reload, reopening without geometry downloads and an
+unchanged previous project after import errors. Physical Android/airplane-mode
+acceptance and comparison against Studio remain outstanding.
 
-Getrennte Adapter:
-
-| Format | Import | Export / tatsächlicher Teststand |
+| Format | Import | Export / actual verification |
 | --- | --- | --- |
-| Internes JSON v1 | Strukturvalidierung; bestehende v1-Projekte bleiben gültig | Vollständige lokale Sicherung einschließlich Importdaten; Roundtrip getestet |
-| LDR | Typ-1-Referenzen, volle Matrizen; fehlende Ressourcen als Hinweise | Aufgelöstes flaches Modell; Matrizen/Farben der echten Referenz im Roundtrip getestet |
-| MPD | FILE-Untermodelle, Namen mit Leerzeichen, Farbvererbung | Unveränderte Quelle bei reinem Importmodell; sonst flacher main.ldr-Abschnitt |
-| IO | Unverschlüsseltes ZIP32 und ältere Studio-ZIP32-Verschlüsselung mit dokumentiertem Standardschlüssel; gezieltes Lesen von model.ldr | Minimaler neuer ZIP-Container mit model.ldr und .info; nur im eigenen Importer getestet, keine Studio-Exportkompatibilität behauptet |
+| Internal JSON v1 | Structure validation; existing v1 projects remain valid | Full local backup including import data; roundtrip tested |
+| LDR | Type-1 references and full matrices; missing resources reported | Resolved flat model; reference matrices/colors roundtrip tested |
+| MPD | FILE submodels, names with spaces, color inheritance | Unchanged source for import-only models; otherwise flat main.ldr section |
+| IO | Unencrypted ZIP32 and older Studio ZIP32 encryption with documented fixed format key; selected model.ldr read | Minimal new ZIP with model.ldr and .info; tested only in our importer, not claimed Studio export compatibility |
 
-Containergrenzen: maximal 32 MiB Upload/angegebene entpackte Summe, 16 MiB je tatsächlich gelesenem ZIP-Eintrag,
-128 Archiveinträge, 1.024 Untermodelle, 48 Hierarchieebenen, 10.000 Instanzen.
-Mehrteilige, AES-/anders verschlüsselte und ZIP64-Archive werden abgelehnt.
-ZIP-Struktur und Pfadgrenzen werden für alle Einträge geprüft; Größen und CRC
-der tatsächlich gelesenen Inhalte nach dem Entpacken. Zusätzliche IO-Ressourcen
-werden nicht entpackt, sondern im Originalarchiv erhalten. Keine Dateisystemextraktion.
-Geometriedetails, Grenzen und Quellenprüfung:
-[`docs/io-reference-analysis.md`](docs/io-reference-analysis.md) und
-[`docs/import-geometry-licensing.md`](docs/import-geometry-licensing.md).
-Die zweite, verschlüsselte IO-Referenz und ihre verbleibenden Grenzen:
-[`docs/legacy-io-reference.md`](docs/legacy-io-reference.md).
+Container limits: 32 MiB upload/declared total uncompressed size, 16 MiB per
+actually read ZIP entry, 128 entries, 1,024 submodels, 48 hierarchy levels and
+10,000 instances. Multipart, AES/other encryption and ZIP64 are rejected.
+Structure/path bounds are checked for every entry; actual decompressed sizes
+and CRCs are checked for read payloads. Extra IO resources stay in the original
+archive without decompression. Nothing is extracted into a filesystem.
 
-## Noch nicht enthalten
+Details: [IO reference analysis](docs/io-reference-analysis.md),
+[geometry licensing](docs/import-geometry-licensing.md), and
+[older encrypted IO reference](docs/legacy-io-reference.md).
+The latter reference has significant missing-geometry limitations.
 
-- Beliebige LDraw-Teile aktiv platzieren oder importierte Instanzen bearbeiten.
-- Vollständiger BrickLink-Teilenummernkatalog, Preise oder Verfügbarkeitsdaten.
-- Allgemeine Studio-Kompatibilität, Texturen, Anleitungen, BFC-/Typ-5-Kanten,
-  physikalisch korrekte Metallic-/Transparenzdarstellung.
-- Mehrfachauswahl, Langzeitmessungen mit tausenden Steinen oder Cloud-Sync.
-- Physischer Android-Abnahmetest.
+## Not included
 
-Das interne JSON-Modell ist versioniert (`schemaVersion: 1`) und besitzt ein
-Metadatenfeld für zukünftige Importer. LDraw- und BrickLink-Nummern sind nicht
-mit den internen Stein-IDs gleichzusetzen. Die getrennte Formatarchitektur,
-Lizenzgrenzen und spätere Prüfschritte sind in
-[`docs/architecture.md`](docs/architecture.md) festgehalten.
+- Placing arbitrary LDraw parts or editing imported instances.
+- A complete BrickLink part catalog, prices or availability.
+- General Studio compatibility, textures, instructions, BFC/type-5 edges,
+  physically accurate metallic/transparency rendering.
+- Multiple selection, long-term measurements with thousands of bricks or cloud sync.
+- Physical Android acceptance.
 
-## Lokale Teilebibliothek
+The internal JSON model is versioned (`schemaVersion: 1`) and supports metadata
+for importers. LDraw/BrickLink numbers are not internal brick IDs.
+See [architecture](docs/architecture.md) for format boundaries and historical
+foundation decisions.
 
-Im Steine-Dialog unter **LDraw-Bibliothek** sind die Pakete **Steine** und
-**Platten** einzeln ladbar (je sechs Teile samt Unterteilen und Primitiven).
-Nach dem Download bleiben Originaldateien, Suchdaten, Urheber und Lizenztexte
-in IndexedDB gespeichert. Name, Kategorie und LDraw-Nummer sind ohne Netzwerk
-durchsuchbar. Pro Paket zeigt „Herkunft und Lizenz“ Quellen, Autoren, Änderungen
-und nach Installation die lokal gespeicherten Rechtstexte.
+## Local parts library
 
-Die Pakete sind unveränderte, geprüfte CC-BY-4.0-Dateien aus der offiziellen
-LDraw-Bibliothek; Details: [`docs/parts-licensing.md`](docs/parts-licensing.md).
-Es handelt sich um eine technische Lizenzprüfung, keine anwaltliche Beratung.
-Netzwerkfehler, falsche Prüfsummen und Speicherfehler werden angezeigt;
-unvollständige Downloads ersetzen keine Installation. Vorhandene Projekte
-bleiben beim Datenbankupgrade erhalten.
+In the brick drawer's **LDraw-Bibliothek**, **Steine** and **Platten** can
+be installed independently, each containing six parts plus subparts/primitives.
+Original files, search data, authors and license texts remain in IndexedDB.
+Name, category and LDraw number can be searched offline. **Herkunft und Lizenz**
+shows source/author/change information and installed legal documents.
 
-Weitere automatisierte Tests prüfen Snapshot-Hashes, rekursive Vollständigkeit,
-getrennte Paketinstallation, Offline-Suche nach Wiederöffnen, Abbruch und
-Fehlerfälle, Transaktions-Rollback und Migration bestehender Projekte.
+These are unchanged, reviewed CC-BY-4.0 files from the official LDraw library;
+see [parts licensing](docs/parts-licensing.md). This is a technical provenance/
+license review, not legal advice. Network, checksum and storage errors are
+shown; incomplete downloads never replace an installation. Database upgrades
+preserve existing projects.
 
-## Entwicklungsbefehle
+Tests cover snapshot hashes, recursive completeness, independent package
+installation, offline search after reopening, cancellation/failure,
+transaction rollback and existing-project migration.
+
+## Development
 
 ```sh
-# Replit injects PORT and BASE_PATH through the managed workflow.
+# Replit supplies PORT and BASE_PATH through the managed workflow.
 # For a local checkout:
 PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run dev
 pnpm --filter @workspace/brickbuilder-mobile run typecheck

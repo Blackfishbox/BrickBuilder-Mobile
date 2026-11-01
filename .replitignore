@@ -4,3 +4,10 @@
 # No need to store the pnpm store twice.
 .local
 /generated-artifacts/
+
+# Private uploads and internal agent context are not deployment inputs.
+/attached_assets/
+/.agents/
+.env
+.env.*
+!.env.example

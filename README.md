@@ -1,0 +1,75 @@
+# BrickBuilder Mobile
+
+A local-first, installable 3D brick-building PWA with a **German application
+interface**. Build with procedural bricks, save projects in your browser,
+install reviewed LDraw parts packages, and import IO, LDR, MPD or internal JSON
+models. No account, paid service or application API is required for the frontend.
+
+Import support is bounded, not a claim of general BrickLink Studio compatibility.
+Imported instances are read-only; editable builder bricks remain separate.
+See the [application documentation](artifacts/brickbuilder-mobile/README.md)
+for supported formats, verification history and limitations.
+
+## Quick start
+
+Tested environment: **Linux x86-64, Node.js 24.22.1, pnpm 10.26.1**.
+The current lockfile and native-package overrides target Linux x86-64;
+other operating systems and CPU architectures have not been validated.
+Install that pnpm version, for example with `npm install --global pnpm@10.26.1`,
+then run:
+
+```sh
+git clone https://github.com/Blackfishbox/BrickBuilder-Mobile.git
+cd BrickBuilder-Mobile
+pnpm install --frozen-lockfile
+PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run dev
+```
+
+Open <http://localhost:4173/>. Both `PORT` and `BASE_PATH` are required by the
+Vite configuration, including for builds and production previews.
+The commands use POSIX shell environment-variable syntax.
+
+## Check and build the standalone frontend
+
+```sh
+pnpm --filter @workspace/brickbuilder-mobile run typecheck
+pnpm --filter @workspace/brickbuilder-mobile run test
+PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run build
+PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run serve
+```
+
+The static deployment directory is
+`artifacts/brickbuilder-mobile/dist/public/`, not the repository root.
+Production preview is for local verification, not an internet-facing production server.
+
+**[Setup and hosting guide](docs/setup-and-hosting.md)** covers clean installs,
+static hosting, root/subpath deployments, HTTPS/PWA caching, browser storage,
+optional API services and troubleshooting.
+
+## Repository map
+
+- `artifacts/brickbuilder-mobile/` — React, TypeScript, Vite, Three.js, Dexie and PWA.
+- `artifacts/brickbuilder-mobile/docs/` — architecture, import evidence and licensing.
+- `artifacts/api-server/` — optional Express service; not used by the current frontend.
+- `lib/` — workspace libraries, API contracts and optional database support.
+- `scripts/` — maintenance and sanitized GitHub backup utilities.
+- `artifacts/mockup-sandbox/` — separate development preview; not needed to host the app.
+
+## Contribution and distribution rules
+
+First-party documentation, code comments, test descriptions and development-facing
+explanations are **English**. Application labels, notifications, localized errors,
+manifest locale and other user-visible content remain **German**. Preserve
+third-party source files, original credits and authoritative license texts verbatim.
+Use specific English commit subjects and bodies; do not rewrite existing history.
+
+GitHub backups are sanitized source snapshots, appended by fast-forward push.
+Private uploads, credentials, local agent context and generated output must not
+be included. Tests needing private uploads skip explicitly when those files are
+absent; independent synthetic regressions run normally.
+
+LDraw resources are separately licensed from application code. See
+[parts licensing](artifacts/brickbuilder-mobile/docs/parts-licensing.md),
+[import geometry licensing](artifacts/brickbuilder-mobile/docs/import-geometry-licensing.md)
+and [BrickLink mapping evidence](artifacts/brickbuilder-mobile/docs/bricklink-mapping-licensing.md).
+No endorsement by LEGO, BrickLink or LDraw is claimed.
