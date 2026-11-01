@@ -95,6 +95,53 @@ for free self-hosting, bounded live requests and explicit official-archive appro
 
 ## Self-hosting: requirements and sizing
 
+### Automated setup (existing Nginx and Certbot certificate)
+
+From a **clean Git checkout on your own Ubuntu 22.04+/Debian 12+ x86-64
+server**, run:
+
+```sh
+# Preview first: no changes, downloads or root access.
+bash scripts/setup-self-host.sh --plan --domain bricks.example.org
+
+# Install, build, configure and start. Replace domain and catalog path.
+sudo bash scripts/setup-self-host.sh \
+  --domain bricks.example.org \
+  --catalog /absolute/path/catalog.bin \
+  --approve-ldraw-download
+```
+
+This single entry point installs the other required host tools, a separate
+official Node 24 toolchain and pnpm, builds from the checked-out Git commit,
+checks data hashes, configures HTTPS Nginx and a loopback-only systemd API,
+starts the service and verifies the HTTPS app, catalog and geometry endpoint.
+It does not install Nginx, obtain a certificate, configure DNS/firewalls,
+publish anything or purchase services.
+
+If Certbot already configured a site for this domain, select its actual
+`sites-available` file and explicitly permit its replacement:
+
+```sh
+sudo bash scripts/setup-self-host.sh \
+  --domain bricks.example.org \
+  --catalog /absolute/path/catalog.bin \
+  --ldraw-dir /absolute/path/reviewed-ldraw \
+  --nginx-site /etc/nginx/sites-available/bricks.example.org \
+  --replace-nginx-site
+```
+
+**Replacement changes that complete selected virtual host**, including custom
+locations. Backups are retained and activation failures trigger restoration.
+Other sites are not intentionally edited. Review the plan and
+[installer guide](docs/self-host-installer.md) first; it explains certificate
+paths, Certbot webroot renewal, data inputs, repeat runs, rollback and limits.
+Use `--catalog-url https://...` instead of `--catalog` if you have an immutable
+HTTPS source for the exact approved binary. A valid full mapping catalog is
+not obtained by silently downloading different current CSVs.
+
+The installer provisions the host; it is **not intended to run in Replit**.
+The following sections document manual hosting and hardware requirements.
+
 **The browser/phone renders the model.** The server distributes files and, if
 enabled, resolves missing geometry. It does not render models, run an AI model,
 store users' projects or need a GPU. A stronger server will not fix a phone's
@@ -340,9 +387,10 @@ The API prefix must **not** fall through to `index.html`. For subpath hosting,
 follow [the detailed path guide](docs/setup-and-hosting.md#hosting-below-a-subpath);
 do not copy root-only locations unchanged.
 
-The Node API currently listens on all interfaces. Keep its port **non-public
-with a firewall**, expose only the HTTPS proxy, retain SSH/admin access as
-needed and add suitable public request limits. Public geometry queries consume
+The Node API defaults to all interfaces for managed previews. Set
+`HOST=127.0.0.1` for independent hosting (the installer does so), keep its port
+**non-public**, expose only the HTTPS proxy, retain SSH/admin access as needed
+and add suitable public request limits. Public geometry queries consume
 bandwidth even though projects themselves stay on clients.
 
 For a persistent API process, use your OS service manager, not Vite preview or
@@ -361,6 +409,7 @@ Type=simple
 User=brickbuilder
 WorkingDirectory=/opt/brickbuilder
 Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
 Environment=PORT=5000
 Environment=LDRAW_APPROVED_DIR=/srv/brickbuilder-data/ldraw-approved
 ExecStart=/usr/bin/node /opt/brickbuilder/artifacts/api-server/dist/index.mjs
@@ -393,19 +442,18 @@ each user must separately export/verify backups of local projects.
 
 ## Which license can be used for GitHub publication?
 
-**Recommendation: MIT for independently authored application code, with
-explicit third-party/data exclusions.** You must hold the necessary rights to
+**MIT applies to independently authored first-party application code and
+documentation, with explicit third-party/data exclusions.** You must hold the necessary rights to
 your own contributions. An MIT application can use separately licensed LDraw
 data; using that data does not automatically make every independently written
 React/Three.js module CC-licensed.
 
-The package manifests currently declare MIT, but this checkout has **no root
-`LICENSE` file**. A manifest field is not a complete distribution notice.
-Before describing a release as fully licensed, the copyright holder should
-add the full chosen software-license text with the correct copyright
-holder/year and a clear statement that third-party files retain their own
-licenses. This README does not change any upstream license or establish
-copyright ownership.
+The full [root LICENSE](LICENSE) names Blackfishbox and contributors and
+expressly excludes third-party material. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+documents resource-specific conditions and source evidence. Retain both files
+and the original upstream notices when redistributing. The installer includes
+copies under the static application's `licenses/first-party/` directory.
+Neither notice grants rights that a contributor does not hold.
 
 | Material | Applicable terms | Distribution obligations |
 | --- | --- | --- |

@@ -31,6 +31,10 @@ editor, but cannot be described as full coverage.
 
 ## Scope and tested toolchain
 
+For an automated independent-host installation with preinstalled Nginx and an
+existing Certbot certificate, see [the installer guide](self-host-installer.md).
+Use `scripts/setup-self-host.sh --plan` to inspect the intended changes first.
+
 The editor can run as a standalone static browser application. An optional
 same-origin resolver downloads approved missing LDraw geometry during import;
 it adds no accounts, cloud sync, paid provider, database or API key requirement.
@@ -76,6 +80,7 @@ merge hook that includes database/backup operations, not the app-only setup.
 | `PORT` | Frontend dev, build and preview | `4173` | Positive TCP port; the config checks it even during a static build |
 | `BASE_PATH` | Frontend dev, build and preview | `/` or `/brickbuilder/` | Public URL path, with leading and trailing `/` |
 | `PORT` | Optional API process | `5000` | Separate API listening port |
+| `HOST` | Optional API bind address | `127.0.0.1` | Literal IPv4/IPv6; defaults to `0.0.0.0` for managed previews |
 | `LDRAW_APPROVED_DIR` | Optional resolver archive mode | Absolute reviewed archive directory | Uses an immutable official archive instead of live per-file requests |
 | `DATABASE_URL` | Optional database library/schema tools | Your own PostgreSQL connection | Not used by the editor, health route or resolver |
 
@@ -253,7 +258,7 @@ and `/api/healthz`. A static host cannot run Express. On any Node-capable host:
 ```sh
 pnpm --filter @workspace/api-server run build
 # Prepare/review the archive first, as described below. Use its absolute path.
-NODE_ENV=production LDRAW_APPROVED_DIR=/absolute/path/to/ldraw-approved \
+NODE_ENV=production HOST=127.0.0.1 LDRAW_APPROVED_DIR=/absolute/path/to/ldraw-approved \
   PORT=5000 pnpm --filter @workspace/api-server run start
 # Alternatively, build and start in development:
 LDRAW_APPROVED_DIR=/absolute/path/to/ldraw-approved \
