@@ -2,6 +2,20 @@
 # Code-only GitHub snapshots; never push Replit checkpoint history.
 set -euo pipefail
 
+COMMIT_SUBJECT="${1:-}"
+COMMIT_BODY="${2:-}"
+if (( ${#COMMIT_SUBJECT} < 12 )) || [[ "$COMMIT_SUBJECT" == *$'\n'* || "$COMMIT_SUBJECT" == *$'\r'* ]]; then
+  echo "Usage: bash scripts/backup-github.sh 'Describe the actual changes' ['Optional details']" >&2
+  echo "A specific, single-line commit subject of at least 12 characters is required." >&2
+  exit 2
+fi
+case "${COMMIT_SUBJECT,,}" in
+  'back up brickbuilder mobile'*|'git commit prior to merge'*|'checkpoint'*|'autosave'*|backup|update|updates|changes|wip|'chore: updates'|'chore: backup')
+    echo "GitHub backup stopped: replace the generic commit subject with the actual changes." >&2
+    exit 2
+    ;;
+esac
+
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 REPOSITORY="https://github.com/Blackfishbox/BrickBuilder-Mobile.git"
@@ -109,7 +123,7 @@ if [[ -n "$REMOTE_COMMIT" ]]; then
   fi
   PARENT_ARGUMENTS=(-p "$REMOTE_COMMIT")
 fi
-COMMIT=$(printf 'Back up BrickBuilder Mobile changes\n\nCode-only snapshot without private uploads or Replit checkpoint history.\n' \
+COMMIT=$(printf '%s\n\n%s\n\nCode-only snapshot without private uploads or Replit checkpoint history.\n' "$COMMIT_SUBJECT" "$COMMIT_BODY" \
   | git commit-tree "$TREE" "${PARENT_ARGUMENTS[@]}")
 
 # A normal fast-forward push rejects concurrent remote changes.

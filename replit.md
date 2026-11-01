@@ -38,8 +38,13 @@ _Describe the high-level user-facing capabilities of this app once they exist._
   Nach abgeschlossenen Codeänderungen und übernommenen Aufgaben den neuen
   Code-Stand ohne erneute Nachfrage in
   `https://github.com/Blackfishbox/BrickBuilder-Mobile` auf `main` sichern.
-- Dafür `bash scripts/backup-github.sh` ausführen. Aufgabenübernahmen rufen
-  dieses Skript über den Post-Merge-Ablauf auf.
+- Dafür `DANGEROUSLY_ALLOW_GIT=1 bash scripts/backup-github.sh "Konkrete Beschreibung der Änderungen"`
+  ausführen; optional einen zweiten Parameter für ausführlichere Details übergeben.
+  Aufgabenübernahmen verwenden die Beschreibung des übernommenen Commits.
+- GitHub-Commits müssen aussagekräftige Nachrichten zu den tatsächlich
+  enthaltenen Änderungen haben, keine generischen Backup-Titel.
+  Eine Historien-Neuschreibung benötigt einen ausdrücklichen Auftrag;
+  reguläre Sicherungen bleiben Fast-Forward-Pushes.
 - Der Post-Merge-Prozess kann ohne Git-Zugang laufen. Ein fehlgeschlagenes
   Backup wird dann unter `.local/github-backup-pending.json` vermerkt, ohne
   den App-Start zu blockieren. Nach der Übernahme den ausstehenden Stand
