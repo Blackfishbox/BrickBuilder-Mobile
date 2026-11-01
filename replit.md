@@ -38,11 +38,14 @@ _Describe the high-level user-facing capabilities of this app once they exist._
   Nach abgeschlossenen Codeänderungen und übernommenen Aufgaben den neuen
   Code-Stand ohne erneute Nachfrage in
   `https://github.com/Blackfishbox/BrickBuilder-Mobile` auf `main` sichern.
-- Dafür `DANGEROUSLY_ALLOW_GIT=1 bash scripts/backup-github.sh "Konkrete Beschreibung der Änderungen"`
+- Dafür `DANGEROUSLY_ALLOW_GIT=1 bash scripts/backup-github.sh "Describe the actual changes in English"`
   ausführen; optional einen zweiten Parameter für ausführlichere Details übergeben.
   Aufgabenübernahmen verwenden die Beschreibung des übernommenen Commits.
-- GitHub-Commits müssen aussagekräftige Nachrichten zu den tatsächlich
-  enthaltenen Änderungen haben, keine generischen Backup-Titel.
+- GitHub-Commits müssen aussagekräftige englische Nachrichten zu den tatsächlich
+  enthaltenen Änderungen haben, sowohl Titel als auch ausführliche Beschreibung.
+  Keine generischen Backup-Titel. Für Aufgabenübernahmen ebenfalls englische
+  Commit-Beschreibungen verwenden, da sie als GitHub-Nachrichten übernommen
+  werden; deutsche Nachrichten nicht unverändert weiterreichen.
   Eine Historien-Neuschreibung benötigt einen ausdrücklichen Auftrag;
   reguläre Sicherungen bleiben Fast-Forward-Pushes.
 - Der Post-Merge-Prozess kann ohne Git-Zugang laufen. Ein fehlgeschlagenes

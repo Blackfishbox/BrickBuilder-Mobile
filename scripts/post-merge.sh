@@ -5,6 +5,7 @@ pnpm --filter db push
 
 # The merge runner may lack the Git authorization available to the Agent shell.
 # Do not prevent application startup when an external backup needs a retry.
+# Task commit subjects must be descriptive English messages (see replit.md).
 BACKUP_SUBJECT=$(git log -1 --format=%s)
 if bash scripts/backup-github.sh "$BACKUP_SUBJECT"; then
   echo "Post-merge GitHub backup completed."

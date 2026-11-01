@@ -2,11 +2,12 @@
 # Code-only GitHub snapshots; never push Replit checkpoint history.
 set -euo pipefail
 
+# Subjects and optional details must describe the changes in English.
 COMMIT_SUBJECT="${1:-}"
 COMMIT_BODY="${2:-}"
 if (( ${#COMMIT_SUBJECT} < 12 )) || [[ "$COMMIT_SUBJECT" == *$'\n'* || "$COMMIT_SUBJECT" == *$'\r'* ]]; then
-  echo "Usage: bash scripts/backup-github.sh 'Describe the actual changes' ['Optional details']" >&2
-  echo "A specific, single-line commit subject of at least 12 characters is required." >&2
+  echo "Usage: bash scripts/backup-github.sh 'Describe the actual changes in English' ['Optional English details']" >&2
+  echo "A specific English single-line commit subject of at least 12 characters is required." >&2
   exit 2
 fi
 case "${COMMIT_SUBJECT,,}" in
