@@ -11,28 +11,42 @@ export function refreshModelColors(model: ImportedModel): void {
   for (const instance of model.instances) {
     // Raw source codes, not previously cached color metadata, are authoritative.
     const prior = instance.color;
-    instance.color = resolveColor(instance.colorCode);
-    if (prior?.ldrawCode === instance.colorCode && (prior.brickLinkId !== undefined || prior.catalog?.brickLinkIds.length) && prior.source && instance.color?.catalog) {
-      const ids = new Set([...instance.color.catalog.brickLinkIds, ...(prior.brickLinkId === undefined ? [] : [prior.brickLinkId]), ...(prior.catalog?.brickLinkIds ?? [])]);
-      if (ids.size > 1) {
-        instance.color.catalog = { ...instance.color.catalog, status: "ambiguous", brickLinkIds: [...ids],
-          sources: [...new Set([instance.color.source, ...(prior.catalog?.sources ?? [prior.source])])] };
-        instance.color.brickLinkId = undefined; instance.color.brickLinkName = undefined;
-      }
+    const current = resolveColor(instance.colorCode);
+    instance.color = current;
+    const metadata = current?.catalog ?? prior?.catalog;
+    if (metadata && prior?.ldrawCode === instance.colorCode && prior.source &&
+        (prior.catalog || prior.brickLinkId !== undefined)) {
+      const ids = new Set([...(current?.catalog?.brickLinkIds ?? []),
+        ...(current?.brickLinkId === undefined ? [] : [current.brickLinkId]),
+        ...(prior.catalog?.brickLinkIds ?? []), ...(prior.brickLinkId === undefined ? [] : [prior.brickLinkId])]);
+      const id = ids.size === 1 ? [...ids][0] : undefined;
+      const appearance = current ?? {
+        ldrawCode: instance.colorCode, name: prior.name, hex: "#FF00AA", alpha: 255,
+        source: `Unresolved appearance for raw LDraw ${instance.colorCode}; saved mapping evidence only`,
+      };
+      const sources = [...new Set([...(current?.catalog?.sources ?? [appearance.source]),
+        ...(prior.catalog?.sources?.length ? prior.catalog.sources : [prior.source])])];
+      instance.color = {
+        ...appearance, brickLinkId: id,
+        brickLinkName: id === undefined ? undefined : current?.brickLinkId === id ? current.brickLinkName : prior.brickLinkId === id ? prior.brickLinkName : undefined,
+        catalog: { ...metadata, status: ids.size === 1 ? "confirmed" : ids.size > 1 ? "ambiguous" : "unknown",
+          brickLinkIds: [...ids], rebrickableIds: [...new Set([...(current?.catalog?.rebrickableIds ?? []), ...(prior.catalog?.rebrickableIds ?? [])])], sources },
+        source: sources.join("\n"),
+      };
     }
     counts.set(instance.colorCode, (counts.get(instance.colorCode) ?? 0) + 1);
   }
   for (const [code, count] of counts) {
     const color = model.instances.find(instance => instance.colorCode === code)?.color ?? resolveColor(code);
-    if (!color) model.issues.push({
+    if (!resolveColor(code)) model.issues.push({
       code: "missing-color", reference: code, count,
       message: `LDraw-Farbe ${code} nicht zugeordnet. Als magentafarbene Warngeometrie dargestellt, Quellfarbcode bleibt erhalten.`,
     });
-    else if (color.catalog?.status === "ambiguous") model.issues.push({
+    else if (color?.catalog?.status === "ambiguous") model.issues.push({
       code: "ambiguous-bl-color", reference: code,
       message: `LDraw ${code}: widersprüchliche BrickLink-Farbnachweise (${color.catalog.brickLinkIds.join(", ")}). Erscheinungsfarbe bleibt erhalten; keine Ziel-ID ausgewählt.`,
     });
-    else if (color.brickLinkId === undefined) model.issues.push({
+    else if (color && color.brickLinkId === undefined) model.issues.push({
       code: "missing-bl-color", reference: code,
       message: `${color.name} (LDraw ${code}) wird mit bekannter LDraw-Farbe dargestellt. Unserer App fehlt lediglich die bestätigte BrickLink-Katalogzuordnung; dies ist kein Farb- oder Importfehler.`,
     });

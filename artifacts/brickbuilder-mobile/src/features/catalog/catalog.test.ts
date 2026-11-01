@@ -91,6 +91,36 @@ describe("complete catalog semantics", () => {
     expect(found[0].mappings.some(row => row[2] === "oldAlias" && row[3] === "False")).toBe(true);
     expect(searchCatalog(fixture(), "unmapped", "parts")[0].id).toBe("unmapped");
   });
+  it("retains confirmed IDs and ambiguous candidates through reopen and save without a catalog snapshot", () => {
+    const data = fixture();
+    data.color_mappings.push(["other", "LD", "2", '["Green"]', "True", "True"]);
+    data.sources.color_mappings.rows++;
+    installCatalogIndex(indexCatalog(data));
+    const text = [2, 4, 123456].map(code => `1 ${code} 0 0 0 1 0 0 0 1 0 0 0 1 test.dat`).join("\n");
+    const model: ImportedModel = { version: 1, format: "ldr", sourceName: "offline.ldr", sourceText: text, originalBytes: [...new TextEncoder().encode(text)],
+      ...parseLDraw(text), resources: {}, legalDocuments: [] };
+    const document = { ...createEmptyDocument(), imported: refreshedCatalogModel(model) };
+    document.imported.instances[0].color!.hex = "#FF00AA"; // Deliberately stale cached appearance.
+    const exported = exportInternal(document);
+    installCatalogIndex(); // No worker index or IndexedDB catalog snapshot is available.
+    const reopened = importInternal(exported);
+    const colors = reopened.imported!.instances.map(instance => instance.color!);
+    expect(colors[0]).toMatchObject({ hex: "#00852B", brickLinkId: 99,
+      catalog: { status: "confirmed", brickLinkIds: [99], rebrickableIds: ["other"] } });
+    expect(colors[1]).toMatchObject({ hex: "#B40000", brickLinkId: undefined,
+      catalog: { status: "ambiguous", brickLinkIds: [5, 99] } });
+    expect(colors[2]).toMatchObject({ hex: "#FF00AA", brickLinkId: 99,
+      catalog: { status: "confirmed", brickLinkIds: [99] } });
+    expect(reopened.imported!.issues.some(issue => issue.code === "missing-color" && issue.reference === "123456")).toBe(true);
+    expect(colors.every(color => color.source.includes("color_mappings.csv.gz"))).toBe(true);
+    const savedAgain = importInternal(exportInternal(reopened));
+    expect(savedAgain.imported!.instances.map(instance => instance.color)).toEqual(colors);
+    expect(savedAgain.imported!.instances.map(instance => [instance.reference, instance.matrix, instance.colorCode]))
+      .toEqual(model.instances.map(instance => [instance.reference, instance.matrix, instance.colorCode]));
+    const recolored = structuredClone(savedAgain);
+    recolored.imported!.instances[0].colorCode = "1";
+    expect(normalizeDocument(recolored).imported!.instances[0].color?.catalog).toBeUndefined();
+  });
 });
 const fullPath = new URL("../../../../../generated-artifacts/catalog-sources/catalog.bin", import.meta.url);
 describe.skipIf(!existsSync(fullPath))("complete approved source snapshot", () => {

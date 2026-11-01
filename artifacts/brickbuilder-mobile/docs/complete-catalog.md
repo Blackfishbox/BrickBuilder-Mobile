@@ -51,6 +51,12 @@ evidence are merged, not replaced. They can increase coverage or expose a
 conflict beyond the source-only figures above. A single distinct target ID is
 confirmed; several remain ambiguous and no target is selected; zero is unknown.
 Evidence survives JSON validation even if property ordering changes.
+Saved color evidence also survives opening an exported project without its
+catalog cache: confirmed IDs, conflicting candidates and source provenance
+remain in subsequent saves. Known raw LDraw colors still determine appearance,
+not stale saved RGB. If neither the active palette nor a loaded catalog can
+resolve an appearance, warning magenta and an explicit unknown-color warning
+remain separate from the retained mapping evidence.
 
 ## Licensing and provenance
 
@@ -150,7 +156,7 @@ Android certification or a production airplane-mode claim.
 
 ### Recorded verification, 2026-11-01
 
-- Frontend: 115 passing tests, two optional fixture tests explicitly skipped.
+- Frontend: 116 passing tests, two optional fixture tests explicitly skipped.
   Backend: eight passing tests. Generator: three passing tests against the full
   downloaded sources, including reproduction of the approved descriptor.
 - Frontend/backend TypeScript checks and production frontend/API builds passed.
