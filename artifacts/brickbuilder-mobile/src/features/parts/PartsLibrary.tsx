@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, CloudOff, Download, ExternalLink, LoaderCircle, Plus, RotateCw, Search, X } from 'lucide-react';
-import { BRICK_DEFINITIONS, type BrickType } from '@/features/editor/model';
 import { PART_PACKAGES, installPackage, listInstalledPackages, searchLocalParts } from './library';
 import type { InstalledPackage, LibraryPart } from './types';
 import './parts-library.css';
 
 type PkgState = { status: 'idle' | 'pending' | 'error'; error?: string };
 type Category = '' | 'Steine' | 'Platten';
-
-const LDRAW_TO_TYPE = new Map<string, BrickType>(
-  Object.entries(BRICK_DEFINITIONS).map(([type, def]) => [def.ldrawId, type as BrickType]),
-);
 
 const formatBytes = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toLocaleString('de-DE', { maximumFractionDigits: 1 })} KB`;
@@ -20,11 +15,12 @@ const errorText = (error: unknown, fallback: string) =>
 
 interface Props {
   online: boolean;
-  selectedType: BrickType;
-  onSelect: (type: BrickType) => void;
+  selectedPartId?: string;
+  loading?: boolean;
+  onSelect: (part: LibraryPart) => void;
 }
 
-export default function PartsLibrary({ online, selectedType, onSelect }: Props) {
+export default function PartsLibrary({ online, selectedPartId, loading = false, onSelect }: Props) {
   const controllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const [installed, setInstalled] = useState<InstalledPackage[] | null>(null);
@@ -236,33 +232,28 @@ export default function PartsLibrary({ online, selectedType, onSelect }: Props) 
             <span>{hasInstalled ? 'Suche nach Name oder LDraw-Nummer, z. B. 3001.' : 'Lade oben ein Paket, um es offline zu durchsuchen.'}</span>
           </div>
         ) : results.map((part) => {
-          const type = LDRAW_TO_TYPE.get(part.ldrawId);
           const body = (
             <>
               <span className="plib-id">LDraw<br /><b>{part.ldrawId}</b></span>
               <span className="drawer-piece-copy">
                 <strong>{part.name}</strong>
-                <small>{part.category} · {type ? 'Im Baukasten verfügbar' : 'Nur Katalog – Geometrie noch nicht unterstützt'}</small>
+                <small>{part.category} · Geometrie wird vor dem Platzieren geprüft</small>
               </span>
             </>
           );
-          return type ? (
+          return (
             <button
               key={part.id}
               type="button"
-              className={`drawer-piece plib-part ${selectedType === type ? 'chosen' : ''}`}
-              onClick={() => onSelect(type)}
+              className={`drawer-piece plib-part ${selectedPartId === part.ldrawId ? 'chosen' : ''}`}
+              disabled={loading}
+              onClick={() => onSelect(part)}
               aria-label={`${part.name}, LDraw ${part.ldrawId}, auswählen`}
               data-testid={`button-library-part-${part.ldrawId}`}
             >
               {body}
-              {selectedType === type ? <Check size={17} className="chosen-check" /> : <Plus size={17} className="add-glyph" />}
+              {selectedPartId === part.ldrawId ? <Check size={17} className="chosen-check" /> : <Plus size={17} className="add-glyph" />}
             </button>
-          ) : (
-            <div key={part.id} className="drawer-piece plib-part is-catalog" data-testid={`catalog-part-${part.ldrawId}`}>
-              {body}
-              <span className="plib-tag">Katalog</span>
-            </div>
           );
         })}
       </div>

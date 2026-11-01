@@ -1,7 +1,7 @@
 # BrickBuilder Mobile
 
-An independent, local-first, installable building PWA. The initial release
-focused on mobile construction with three parametric brick shapes. This is
+An independent, local-first, installable building PWA with an LDraw-only parts
+picker and individually editable imported model instances. This is
 not a BrickLink Studio clone and does not use proprietary Studio resources.
 The application interface is deliberately German; repository-facing material
 is English.
@@ -15,7 +15,7 @@ see the [root README](../../README.md) and
 - Responsive portrait/landscape UI with touch toolbar, brick selection,
   local search and color selection.
 - Interactive Three.js scene with baseplate, grid, half-unit snapping and
-  procedural 2×4, 2×2 and 1×2 bricks.
+  licensed LDraw geometry. Previously saved procedural bricks remain editable.
 - Place, select, drag, rotate, delete, undo and redo.
 - One-finger camera rotation; two-finger zoom, rotation and panning.
 - InstancedMesh grouping by type/color in WebGL2 mode.
@@ -74,7 +74,10 @@ Original upload bytes, submodel source, additional IO archive data, LDraw files,
 credits and license texts remain in the local project. After successful
 import, reopening needs no network. The extra reviewed geometry snapshot is
 loaded on demand during import, not at startup, without changing the package
-catalog system. Imported instances are read-only; builder bricks remain editable.
+catalog system. Imported instances support individual selection, movement,
+quarter-turn rotation, recoloring and deletion, including undo/redo and local
+persistence. See the [editing guide](docs/editing.md) for touch controls and
+the explicit limits of flattened edited MPD/minimal IO exports.
 
 The earlier mobile browser flow with the real reference checked a visible
 assembled car, persistence/reload, reopening without geometry downloads and an

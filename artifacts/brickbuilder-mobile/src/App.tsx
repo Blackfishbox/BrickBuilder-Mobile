@@ -1,8 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
+import { COLORS as LDRAW_COLORS } from '@/features/formats/colors';
 import { useBuilder } from '@/features/editor/useBuilder';
 import {
   BRICK_DEFINITIONS,
-  BRICK_PALETTE,
   type BrickType,
   type ToolMode,
 } from '@/features/editor/model';
@@ -25,7 +25,6 @@ import {
   Plus,
   RotateCw,
   Save,
-  Search,
   Settings2,
   Trash2,
   Undo2,
@@ -46,7 +45,7 @@ const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   studs: definition.studsX * definition.studsZ,
 }));
 
-const COLORS = BRICK_PALETTE;
+const COLORS = LDRAW_COLORS.map(color => ({ name: color.name, value: color.hex, ldrawCode: color.ldrawCode }));
 const BuilderCanvas = lazy(() => import('@/features/engine/BuilderCanvas'));
 
 function App() {
@@ -54,14 +53,15 @@ function App() {
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [partsOpen, setPartsOpen] = useState(false);
   const [colorsOpen, setColorsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [partsTab, setPartsTab] = useState<'basis' | 'ldraw'>('basis');
   const [projectMenu, setProjectMenu] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [formatsOpen, setFormatsOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
+  useEffect(() => {
+    if (!partsOpen) editor.cancelPartPreparation();
+  }, [partsOpen, editor.cancelPartPreparation]);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -88,11 +88,6 @@ function App() {
   useEffect(() => {
     if (projectMenu) void editor.refreshProjects().catch(() => undefined);
   }, [editor.refreshProjects, projectMenu]);
-
-  const filteredBricks = useMemo(
-    () => BRICKS.filter((item) => `${item.label} ${item.dimensions}`.toLowerCase().includes(search.toLowerCase())),
-    [search],
-  );
 
   const saveProject = async () => {
     setSaveMessage('');
@@ -139,7 +134,11 @@ function App() {
 
   const setMode = (mode: ToolMode) => editor.setToolMode(mode);
   const selectedBrick = BRICKS.find((brick) => brick.type === editor.selectedType) ?? BRICKS[0];
-  const selectedColor = COLORS.find((color) => color.value.toLowerCase() === editor.selectedColor.toLowerCase()) ?? COLORS[0];
+  const selectedColor = COLORS.find(color => color.ldrawCode === editor.selectedColorCode) ??
+    COLORS.find((color) => color.value.toLowerCase() === editor.selectedColor.toLowerCase()) ?? { name: "Eigene Farbe", value: editor.selectedColor, ldrawCode: "" };
+  const isSelectedColor = (color: typeof COLORS[number]) => editor.selectedColorCode
+    ? editor.selectedColorCode === color.ldrawCode
+    : editor.selectedColor.toLowerCase() === color.value.toLowerCase();
 
   if (!editor.isReady) {
     return (
@@ -263,9 +262,10 @@ function App() {
                 onMove={editor.move}
               />
             </Suspense>
+            {editor.partError && !partsOpen && <p role="alert" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm" data-testid="status-part-error">{editor.partError}</p>}
             {editor.imported && (
               <button type="button" className="import-report-button" onClick={() => setFormatsOpen(true)} data-testid="button-import-report">
-                Import: {editor.imported.instances.length} Instanzen · {editor.imported.issues.length} Hinweise / Zuordnungen
+                LDraw: {editor.imported.instances.length} Teile · {editor.imported.issues.length} Hinweise / Zuordnungen
               </button>
             )}
             {editor.brickCount === 0 && (
@@ -277,7 +277,7 @@ function App() {
           </div>
           {editor.selectedId && (
             <div className="mobile-selection-actions" data-testid="mobile-selection-actions">
-              <span className="mobile-selection-label"><Box size={14} /> Stein ausgewählt</span>
+              <span className="mobile-selection-label"><Box size={14} /> {editor.selectedInstance ? `LDraw ${editor.selectedInstance.part.ldrawId}` : "Stein ausgewählt"}</span>
               <button type="button" onClick={editor.rotateSelected} aria-label="Ausgewählten Stein drehen" data-testid="mobile-button-rotate"><RotateCw size={17} /></button>
               <button type="button" onClick={editor.deleteSelected} aria-label="Ausgewählten Stein entfernen" data-testid="mobile-button-delete-selected"><Trash2 size={17} /></button>
             </div>
@@ -285,7 +285,7 @@ function App() {
           <div className="canvas-footline">
             <span className="grid-caption"><span className="grid-indicator" /> GRID SNAP ON</span>
             <button type="button" className="parts-open-button" onClick={() => setPartsOpen(true)} data-testid="button-open-parts">
-              <Layers3 size={16} /><span>Steine</span><span className="parts-count">{BRICKS.length}</span>
+              <Layers3 size={16} /><span>Steine</span><span className="parts-count">LDraw</span>
             </button>
           </div>
         </div>
@@ -316,25 +316,23 @@ function App() {
           <div className="rail-section parts-section">
             <div className="section-heading"><span>02</span><h2>Stein</h2></div>
             <button type="button" className="active-piece" onClick={() => setPartsOpen(true)} data-testid="button-selected-piece">
-              <span className={`brick-glyph ${editor.selectedType}`} style={{ '--brick-color': selectedColor.value } as CSSProperties} aria-hidden="true">
-                {Array.from({ length: selectedBrick.studs }, (_, index) => <i key={index} />)}
-              </span>
-              <span className="piece-copy"><strong>{selectedBrick.dimensions}</strong><small>{selectedBrick.label}</small></span>
+              <span aria-hidden="true"><Box size={28} /></span>
+              <span className="piece-copy"><strong>{editor.selectedPart ? `LDraw ${editor.selectedPart.ldrawId}` : "LDraw-Teil wählen"}</strong><small>{editor.selectedPart?.name ?? "Offline-Bibliothek öffnen"}</small></span>
               <ChevronDown size={16} className="piece-chevron" />
             </button>
             <div className="color-heading"><span>FARBE</span><span className="color-name">{selectedColor.name}</span></div>
-            <div className="color-grid" role="group" aria-label="Brick color">
+            <div className="color-grid" role="group" aria-label="Steinfarbe" style={{ maxHeight: 180, overflowY: "auto" }}>
               {COLORS.map((color) => (
                 <button
-                  key={color.value}
+                  key={color.ldrawCode}
                   type="button"
-                  className={`swatch ${editor.selectedColor.toLowerCase() === color.value.toLowerCase() ? 'selected' : ''}`}
+                  className={`swatch ${isSelectedColor(color) ? 'selected' : ''}`}
                   style={{ '--swatch-color': color.value } as CSSProperties}
                   aria-label={`${color.name} auswählen`}
-                  aria-pressed={editor.selectedColor.toLowerCase() === color.value.toLowerCase()}
-                  onClick={() => editor.setSelectedColor(color.value)}
+                  aria-pressed={isSelectedColor(color)}
+                  onClick={() => editor.setSelectedColor(color.value, color.ldrawCode)}
                   data-testid={`button-color-${color.name.toLowerCase()}`}
-                >{editor.selectedColor.toLowerCase() === color.value.toLowerCase() && <Check size={13} />}</button>
+                >{isSelectedColor(color) && <Check size={13} />}</button>
               ))}
             </div>
           </div>
@@ -345,7 +343,7 @@ function App() {
               <>
                 <div className="selection-detail" role="status" data-testid="status-selected-brick">
                   <span className="selection-mark"><Box size={16} /></span>
-                  <span><strong>{selectedBrick.dimensions} Stein</strong><small>Kann bearbeitet werden</small></span>
+                  <span><strong>{editor.selectedInstance ? `LDraw ${editor.selectedInstance.part.ldrawId}` : `${selectedBrick.dimensions} Stein`}</strong><small>Kann bearbeitet werden</small></span>
                 </div>
                 <div className="selection-actions">
                   <button type="button" className="selection-action" onClick={editor.rotateSelected} data-testid="button-rotate">
@@ -404,18 +402,18 @@ function App() {
               <div><p className="popover-eyebrow">STEINFARBE</p><h2 id="colors-title">Farbe auswählen</h2></div>
               <button type="button" className="icon-button" onClick={() => setColorsOpen(false)} aria-label="Farbauswahl schließen" data-testid="button-close-colors"><X size={18} /></button>
             </div>
-            <div className="mobile-color-grid" role="group" aria-label="Steinfarbe">
+            <div className="mobile-color-grid" role="group" aria-label="Steinfarbe" style={{ maxHeight: "55vh", overflowY: "auto" }}>
               {COLORS.map((color) => (
                 <button
-                  key={color.value}
+                  key={color.ldrawCode}
                   type="button"
-                  className={`mobile-color-option ${editor.selectedColor.toLowerCase() === color.value.toLowerCase() ? 'selected' : ''}`}
-                  onClick={() => { editor.setSelectedColor(color.value); setColorsOpen(false); }}
+                  className={`mobile-color-option ${isSelectedColor(color) ? 'selected' : ''}`}
+                  onClick={() => { editor.setSelectedColor(color.value, color.ldrawCode); setColorsOpen(false); }}
                   data-testid={`mobile-color-${color.name.toLowerCase()}`}
                 >
                   <span style={{ '--swatch-color': color.value } as CSSProperties} />
                   <span>{color.name}</span>
-                  {editor.selectedColor.toLowerCase() === color.value.toLowerCase() && <Check size={16} />}
+                  {isSelectedColor(color) && <Check size={16} />}
                 </button>
               ))}
             </div>
@@ -431,49 +429,17 @@ function App() {
               <div><p className="popover-eyebrow">DEINE STEINE</p><h2 id="parts-title">Steinauswahl</h2></div>
               <button type="button" className="icon-button" onClick={() => setPartsOpen(false)} aria-label="Steinauswahl schließen" data-testid="button-close-parts"><X size={18} /></button>
             </div>
-            <div className="drawer-tabs" role="tablist" aria-label="Steinquelle">
-              <button type="button" role="tab" id="tab-basis" aria-controls="panel-basis" aria-selected={partsTab === 'basis'} onClick={() => setPartsTab('basis')} data-testid="tab-parts-basis">Baukasten</button>
-              <button type="button" role="tab" id="tab-ldraw" aria-controls="panel-ldraw" aria-selected={partsTab === 'ldraw'} onClick={() => setPartsTab('ldraw')} data-testid="tab-parts-ldraw">LDraw-Bibliothek</button>
-            </div>
-            {partsTab === 'basis' ? (
-              <div role="tabpanel" id="panel-basis" aria-labelledby="tab-basis">
-              <label className="search-field">
-                <Search size={17} />
-                <input type="search" placeholder="Stein suchen" value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Steine suchen" data-testid="input-search-parts" />
-                {search && <button type="button" onClick={() => setSearch('')} aria-label="Clear search" data-testid="button-clear-search"><X size={15} /></button>}
-              </label>
-              <div className="drawer-list">
-                {filteredBricks.length ? filteredBricks.map((brick) => (
-                  <button
-                    type="button"
-                    key={brick.type}
-                    className={`drawer-piece ${editor.selectedType === brick.type ? 'chosen' : ''}`}
-                    onClick={() => { editor.setSelectedType(brick.type); setMode('build'); setPartsOpen(false); }}
-                    data-testid={`button-part-${brick.type}`}
-                  >
-                    <span className={`brick-glyph ${brick.type}`} style={{ '--brick-color': selectedColor.value } as CSSProperties} aria-hidden="true">
-                      {Array.from({ length: brick.studs }, (_, index) => <i key={index} />)}
-                    </span>
-                    <span className="drawer-piece-copy"><strong>{brick.label}</strong><small>{brick.dimensions} Noppen · {brick.studs} Verbindungspunkte</small></span>
-                    {editor.selectedType === brick.type ? <Check size={17} className="chosen-check" /> : <Plus size={17} className="add-glyph" />}
-                  </button>
-                )) : (
-                  <div className="drawer-empty" data-testid="status-no-parts">
-                    <Search size={21} /><strong>Keine passenden Steine</strong><span>Versuche eine Größe wie 2 × 4.</span>
-                  </div>
-                )}
-              </div>
-                </div>
-            ) : (
-              <div role="tabpanel" id="panel-ldraw" aria-labelledby="tab-ldraw">
+            <div id="panel-ldraw" aria-label="LDraw-Bibliothek">
+                {editor.partLoading && <p role="status">LDraw-Geometrie wird geladen …</p>}
+                {editor.partError && <p role="alert">{editor.partError}</p>}
                 <PartsLibrary
                   online={online}
-                  selectedType={editor.selectedType}
-                  onSelect={(type) => { editor.setSelectedType(type); setMode('build'); setPartsOpen(false); }}
+                  selectedPartId={editor.selectedPart?.ldrawId}
+                  loading={editor.partLoading}
+                  onSelect={part => { void editor.selectLibraryPart(part).then(success => { if (success) setPartsOpen(false); }); }}
                 />
               </div>
-            )}
-            <p className="drawer-footnote"><span className="local-lock" /> Die Auswahl wird lokal gespeichert</p>
+            <p className="drawer-footnote"><span className="local-lock" /> Installierte Teilepakete bleiben offline verfügbar</p>
           </section>
         </div>
       )}

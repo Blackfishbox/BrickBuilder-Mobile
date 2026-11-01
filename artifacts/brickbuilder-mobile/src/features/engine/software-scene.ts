@@ -13,6 +13,8 @@ export interface SoftwareScene {
   bounds: Box3;
   sourceTriangles: number;
   triangleCount: number;
+  triangleIds: string[];
+  instanceBounds: Map<string, Box3>;
 }
 
 /** Prepare a bounded preview from real source triangles, not procedural bricks. */
@@ -22,6 +24,8 @@ export async function createSoftwareScene(model: ImportedModel, options: SceneBu
   const positions = new Float32Array(Math.min(SOFTWARE_TRIANGLE_BUDGET, perInstance * instances.length) * 9);
   const alpha = new Float32Array(positions.length / 9);
   const colors: string[] = [];
+  const triangleIds: string[] = [];
+  const instanceBounds = new Map<string, Box3>();
   const bounds = new Box3(), boxes = new Map<string, Box3>();
   const vertex = new Vector3(), a = new Vector3(), b = new Vector3(), c = new Vector3();
   const light = new Vector3(-0.4, 0.8, 0.5).normalize();
@@ -40,7 +44,9 @@ export async function createSoftwareScene(model: ImportedModel, options: SceneBu
       }
       boxes.set(instance.reference, box);
     }
-    bounds.union(box.clone().applyMatrix4(matrix));
+    const worldBounds = box.clone().applyMatrix4(matrix);
+    bounds.union(worldBounds);
+    instanceBounds.set(instance.id, worldBounds);
     const total = surfaces.reduce((sum, surface) => sum + surface.positions.length / 9, 0);
     sourceTriangles += total;
     const count = Math.min(perInstance, total);
@@ -58,6 +64,7 @@ export async function createSoftwareScene(model: ImportedModel, options: SceneBu
       const normal = vertex.copy(b).sub(a).cross(c.clone().sub(a)).normalize();
       const mapping = resolveColor(surface.colorCode);
       colors.push(new Color(mapping?.hex ?? "#ff00ff").multiplyScalar(0.6 + 0.4 * Math.abs(normal.dot(light))).getStyle());
+      triangleIds.push(instance.id);
       alpha[triangles++] = (mapping?.alpha ?? 255) / 255;
     }
     if (performance.now() - slice > 6) {
@@ -66,5 +73,5 @@ export async function createSoftwareScene(model: ImportedModel, options: SceneBu
       slice = performance.now();
     }
   }
-  return { positions, colors, alpha, bounds, sourceTriangles, triangleCount: triangles };
+  return { positions, colors, alpha, bounds, sourceTriangles, triangleCount: triangles, triangleIds, instanceBounds };
 }

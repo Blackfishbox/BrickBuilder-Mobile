@@ -13,6 +13,13 @@ interface PendingSurface { colorCode: string; positions: number[]; edges: number
 const cache = new WeakMap<ImportedModel, Map<string, Surface[]>>();
 const MAX_VERTICES = 1_500_000;
 export function invalidateGeometry(model: ImportedModel) { cache.delete(model); }
+export function reuseGeometryCache(previous: ImportedModel | undefined, next: ImportedModel): void {
+  if (!previous || previous === next || cache.has(next)) return;
+  const compiled = cache.get(previous);
+  if (compiled && Object.entries(previous.resources).every(([path, file]) => next.resources[path]?.content === file.content)) {
+    cache.set(next, new Map(compiled));
+  }
+}
 export function hasCompiledPart(model: ImportedModel, reference: string): boolean {
   return cache.get(model)?.has(normalizeReference(reference)) ?? false;
 }

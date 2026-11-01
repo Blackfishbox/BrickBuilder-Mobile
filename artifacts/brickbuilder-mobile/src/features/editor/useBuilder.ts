@@ -13,6 +13,9 @@ import {
   type ToolMode,
 } from "./model";
 import { commit, createHistory, redo, undo, type HistoryState } from "./history";
+import type { LibraryPart } from "../parts/types";
+import { resolveColor } from "../formats/colors";
+import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
 import {
   listProjectSummaries,
   type ProjectSummary,
@@ -39,7 +42,13 @@ export function useBuilder() {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<BrickType>("brick-2x4");
-  const [selectedColor, setSelectedColorValue] = useState("#d75b3f");
+  const [selectedColor, setSelectedColorValue] = useState("#B40000");
+  const [selectedColorCode, setSelectedColorCode] = useState<string | undefined>("4");
+  const [preparedPart, setPreparedPart] = useState<PreparedPart | null>(null);
+  const [partLoading, setPartLoading] = useState(false);
+  const [partError, setPartError] = useState<string | null>(null);
+  const partControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => () => partControllerRef.current?.abort(), []);
   const [toolMode, setToolMode] = useState<ToolMode>("build");
   const [isReady, setIsReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,6 +92,7 @@ export function useBuilder() {
       const stored = await loadCurrentProject();
       if (stored) {
         replaceDocument(stored, true);
+        if (stored.imported) setToolMode("select");
         setSavedAt(stored.updatedAt);
         restored = true;
       } else {
@@ -173,9 +183,14 @@ export function useBuilder() {
   }, []);
 
   const setSelectedColor = useCallback(
-    (color: string) => {
+    (color: string, code?: string) => {
       setSelectedColorValue(color);
+      setSelectedColorCode(code);
       if (!selectedId) return;
+      if (historyRef.current.document.imported?.instances.some(instance => instance.id === selectedId)) {
+        updateDocument(document => recolorImported(document, selectedId, color, code));
+        return;
+      }
       updateDocument((document) => ({
         ...document,
         updatedAt: new Date().toISOString(),
@@ -187,31 +202,50 @@ export function useBuilder() {
     [selectedId, updateDocument],
   );
 
+  const selectLibraryPart = useCallback(async (part: LibraryPart) => {
+    partControllerRef.current?.abort();
+    const controller = new AbortController();
+    partControllerRef.current = controller;
+    setPartLoading(true); setPartError(null);
+    try {
+      const prepared = await prepareLibraryPart(part, controller.signal);
+      if (controller.signal.aborted) return false;
+      setPreparedPart(prepared);
+      setSelectedId(null); setToolMode("build");
+      return true;
+    } catch (error) {
+      if (!controller.signal.aborted) setPartError(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally { if (!controller.signal.aborted) setPartLoading(false); }
+  }, []);
+  const cancelPartPreparation = useCallback(() => {
+    partControllerRef.current?.abort();
+    setPartLoading(false);
+  }, []);
+
   const place = useCallback(
     (position: Position3) => {
-      const snapped = snapPosition(position);
-      const brick: Brick = {
-        id: crypto.randomUUID(),
-        type: selectedType,
-        color: selectedColor,
-        x: snapped.x,
-        y: Math.round(snapped.y / BRICK_HEIGHT) * BRICK_HEIGHT,
-        z: snapped.z,
-        rotation: 0,
-      };
-      if (toolMode === "delete") return;
-      updateDocument((document) => ({
-        ...document,
-        updatedAt: new Date().toISOString(),
-        bricks: [...document.bricks, brick],
-      }));
-      setSelectedId(brick.id);
+      if (toolMode === "delete" || partLoading) return;
+      if (!preparedPart) { setPartError("Bitte zuerst ein Teil aus der LDraw-Bibliothek auswählen."); return; }
+      try {
+        let id: string | null = null;
+        updateDocument(document => {
+          const next = placePreparedPart(document, preparedPart, position, selectedColor, selectedColorCode);
+          id = next.imported!.instances.at(-1)!.id;
+          return next;
+        });
+        setSelectedId(id); setPartError(null);
+      } catch (error) { setPartError(error instanceof Error ? error.message : String(error)); }
     },
-    [selectedColor, selectedType, toolMode, updateDocument],
+    [selectedColor, selectedColorCode, preparedPart, partLoading, toolMode, updateDocument],
   );
 
   const move = useCallback(
     (id: string, position: Position3) => {
+      if (historyRef.current.document.imported?.instances.some(instance => instance.id === id)) {
+        updateDocument(document => moveImported(document, id, position));
+        return;
+      }
       const snapped = snapPosition(position);
       const existing = historyRef.current.document.bricks.find((brick) => brick.id === id);
       if (
@@ -237,6 +271,11 @@ export function useBuilder() {
 
   const remove = useCallback(
     (id: string) => {
+      if (historyRef.current.document.imported?.instances.some(instance => instance.id === id)) {
+        updateDocument(document => editImported(document, id, () => null));
+        setSelectedId(current => current === id ? null : current);
+        return;
+      }
       updateDocument((document) => ({
         ...document,
         updatedAt: new Date().toISOString(),
@@ -254,12 +293,29 @@ export function useBuilder() {
         return;
       }
       setSelectedId(id);
+      setPartError(null);
+      const instance = historyRef.current.document.imported?.instances.find(item => item.id === id);
+      if (instance) {
+        const color = resolveColor(instance.colorCode);
+        if (color) { setSelectedColorValue(color.hex); setSelectedColorCode(instance.colorCode); }
+      }
     },
     [remove, toolMode],
   );
 
+  useEffect(() => {
+    const instance = history.document.imported?.instances.find(item => item.id === selectedId);
+    if (!instance) return;
+    setSelectedColorValue(resolveColor(instance.colorCode)?.hex ?? "#ff00ff");
+    setSelectedColorCode(instance.colorCode);
+  }, [history.document.imported, selectedId]);
+
   const rotateSelected = useCallback(() => {
     if (!selectedId) return;
+    if (historyRef.current.document.imported?.instances.some(instance => instance.id === selectedId)) {
+      updateDocument(document => rotateImported(document, selectedId));
+      return;
+    }
     updateDocument((document) => ({
       ...document,
       updatedAt: new Date().toISOString(),
@@ -281,7 +337,7 @@ export function useBuilder() {
     documentRef.current = next.document;
     setHistory(next);
     setSelectedId((current) =>
-      current && next.document.bricks.some((brick) => brick.id === current)
+      current && (next.document.bricks.some((brick) => brick.id === current) || next.document.imported?.instances.some(instance => instance.id === current))
         ? current
         : null,
     );
@@ -293,7 +349,7 @@ export function useBuilder() {
     documentRef.current = next.document;
     setHistory(next);
     setSelectedId((current) =>
-      current && next.document.bricks.some((brick) => brick.id === current)
+      current && (next.document.bricks.some((brick) => brick.id === current) || next.document.imported?.instances.some(instance => instance.id === current))
         ? current
         : null,
     );
@@ -323,7 +379,7 @@ export function useBuilder() {
       replaceDocument(project, true);
       setSavedAt(project.updatedAt);
       setSelectedId(null);
-      setToolMode("build");
+      setToolMode(project.imported ? "select" : "build");
       await refreshProjects();
       return true;
     },
@@ -355,11 +411,13 @@ export function useBuilder() {
   const resolveImportedProject = useCallback(async (id: string, model: NonNullable<BuilderDocument["imported"]>) => {
     const current = historyRef.current.document;
     if (current.id !== id || current.imported?.sourceText !== model.sourceText) throw new Error("Projekt wurde inzwischen gewechselt.");
-    const updated = { ...current, imported: model, updatedAt: new Date().toISOString() };
+    const updated = { ...current, imported: enrichImportedGeometry(current.imported!, model), updatedAt: new Date().toISOString() };
     await saveProject(updated);
     if (historyRef.current.document.id !== id) return;
-    // Geometry is read-only enrichment; preserve the editable brick undo/redo history.
-    const enrich = (doc: BuilderDocument) => ({ ...doc, imported: model });
+    // Merge only acquired geometry into every historical snapshot; keep its own
+    // colors, transforms, added parts and deletions, including concurrent edits.
+    const enrich = (doc: BuilderDocument) => doc.imported
+      ? { ...doc, imported: enrichImportedGeometry(doc.imported, model) } : doc;
     const next = { document: enrich(historyRef.current.document),
       past: historyRef.current.past.map(enrich), future: historyRef.current.future.map(enrich) };
     historyRef.current = next;
@@ -379,6 +437,10 @@ export function useBuilder() {
     selectedId,
     selectedType,
     selectedColor,
+    selectedColorCode,
+    selectedPart: preparedPart?.part ?? null,
+    selectedInstance: document.imported?.instances.find(instance => instance.id === selectedId) ?? null,
+    selectLibraryPart, cancelPartPreparation, partLoading, partError,
     toolMode,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,

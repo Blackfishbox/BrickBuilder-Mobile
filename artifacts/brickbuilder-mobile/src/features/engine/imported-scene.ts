@@ -88,6 +88,7 @@ function addFaces(root: Group, surfaces: Surface[], instances: ImportedInstance[
   mesh.computeBoundingBox();
   mesh.computeBoundingSphere();
   mesh.name = `ldraw:${instances[0].reference}`;
+  mesh.userData.brickIds = instances.map(instance => instance.id);
   root.add(mesh);
 }
 

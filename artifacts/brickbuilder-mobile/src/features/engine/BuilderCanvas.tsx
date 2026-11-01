@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   BoxGeometry,
   Box3,
+  Box3Helper,
   BufferGeometry,
   Color,
   CylinderGeometry,
@@ -28,7 +29,8 @@ import {
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { createImportedGroupAsync, disposeImportedScene, SceneBudgetExceeded } from "./imported-scene";
 import { prepareGeometry } from "./prepare-geometry";
-import { invalidateGeometry } from "./ldraw-geometry";
+import { reuseGeometryCache } from "./ldraw-geometry";
+import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
 import { createSoftwareScene, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { createBuilderLighting } from "./lighting";
 import type { ImportedModel } from "../formats/types";
@@ -179,7 +181,7 @@ class FallbackRenderer {
     // Bounded, pretransformed source triangles; never traverse the full model
     // or allocate millions of world-space vectors for a camera movement.
     if (imported) {
-      const faces: { points: ProjectedPoint[]; depth: number; color: string; alpha: number }[] = [];
+      const faces: { points: ProjectedPoint[]; depth: number; color: string; alpha: number; selected: boolean }[] = [];
       const stride = interactive ? Math.max(1, Math.ceil(imported.triangleCount / INTERACTIVE_TRIANGLE_BUDGET)) : 1;
       for (let triangle = 0; triangle < imported.triangleCount; triangle += stride) {
             const index = triangle * 9, vertices = imported.positions;
@@ -187,7 +189,7 @@ class FallbackRenderer {
             if (points.some(p => p.depth < 0.1)) continue;
             const area = (points[1].x - points[0].x) * (points[2].y - points[0].y) - (points[1].y - points[0].y) * (points[2].x - points[0].x);
             if (Math.abs(area) < 0.08) continue;
-            faces.push({ points, depth: points.reduce((s, p) => s + p.depth, 0) / 3, color: imported.colors[triangle], alpha: imported.alpha[triangle] });
+            faces.push({ points, depth: points.reduce((s, p) => s + p.depth, 0) / 3, color: imported.colors[triangle], alpha: imported.alpha[triangle], selected: imported.triangleIds[triangle] === selectedId });
       }
       faces.sort((a, b) => b.depth - a.depth);
       for (const face of faces) {
@@ -195,6 +197,10 @@ class FallbackRenderer {
         context.globalAlpha = face.alpha;
         context.fillStyle = face.color;
         context.fill();
+        if (face.selected) {
+          context.globalAlpha = 1;
+          context.strokeStyle = "#e45e32"; context.lineWidth = 1.5; context.stroke();
+        }
       }
       context.globalAlpha = 1;
     }
@@ -420,6 +426,8 @@ export function BuilderCanvas({
   const rendererRef = useRef<WebGLRenderer | FallbackRenderer | null>(null);
   const brickRootRef = useRef<Group | null>(null);
   const importedRootRef = useRef<Group | null>(null);
+  const sceneModelRef = useRef<ImportedModel | undefined>(undefined);
+  const selectionOutlineRef = useRef<Box3Helper | null>(null);
   const importedBoundsRef = useRef<Box3 | null>(null);
   const softwareSceneRef = useRef<SoftwareScene | undefined>(undefined);
   const importedOffsetRef = useRef(0);
@@ -429,6 +437,21 @@ export function BuilderCanvas({
   const [renderWarning, setRenderWarning] = useState<string | null>(null);
   const [buildAttempt, setBuildAttempt] = useState(0);
   const [forceCompatibility, setForceCompatibility] = useState(false);
+  const updateImportedSelection = () => {
+    const old = selectionOutlineRef.current;
+    if (old) { sceneRef.current?.remove(old); old.geometry.dispose(); disposeMaterial(old.material); selectionOutlineRef.current = null; }
+    const id = propsRef.current.selectedId, root = importedRootRef.current;
+    if (id && root) {
+      const bounds = importedSelectionBounds(root, id);
+      if (bounds) {
+        const outline = new Box3Helper(bounds, 0xe45e32);
+        for (const material of Array.isArray(outline.material) ? outline.material : [outline.material]) material.depthTest = false;
+        outline.renderOrder = 100;
+        sceneRef.current?.add(outline); selectionOutlineRef.current = outline;
+      }
+    }
+    invalidatorRef.current?.();
+  };
   const invalidatorRef = useRef<(() => void) | null>(null);
   const raycasterRef = useRef(new Raycaster());
   const propsRef = useRef({
@@ -624,6 +647,11 @@ export function BuilderCanvas({
     const camera = cameraRef.current;
     if (!scene || !camera) return;
     const previous = importedRootRef.current;
+    const previousModel = sceneModelRef.current;
+    const sameModel = !!imported && previousModel?.originalBytes === imported.originalBytes;
+    const previousOffset = importedOffsetRef.current;
+    if (imported) reuseGeometryCache(previousModel, imported);
+    sceneModelRef.current = imported;
     if (previous) { scene.remove(previous); disposeImported(previous); }
     importedRootRef.current = null;
     importedBoundsRef.current = null;
@@ -675,14 +703,12 @@ export function BuilderCanvas({
         const software = await createSoftwareScene(imported, { signal: controller.signal, onProgress: progress("Kompatibilitätsansicht") });
         controller.signal.throwIfAborted();
         softwareSceneRef.current = software;
-        invalidateGeometry(imported);
         bounds = software.bounds.clone();
         setRenderWarning(`Kompatibilitätsansicht ohne WebGL: ${software.triangleCount.toLocaleString("de-DE")} von ${software.sourceTriangles.toLocaleString("de-DE")} Dreiecken. Während der Bewegung sind Details reduziert; alle Projektdaten bleiben erhalten.`);
       }
-      invalidateGeometry(imported);
       if (controller.signal.aborted) { if (root) disposeImported(root); return; }
       if (!bounds.isEmpty()) {
-        const offset = Math.max(0, -bounds.min.y);
+        const offset = sameModel ? previousOffset : Math.max(0, -bounds.min.y);
         if (root) root.position.y = offset;
         importedOffsetRef.current = offset;
         bounds.translate(new Vector3(0, offset, 0));
@@ -692,9 +718,10 @@ export function BuilderCanvas({
           camera.aspect = rectangle.width / rectangle.height;
           camera.updateProjectionMatrix();
         }
-        fitImportedView(camera, bounds, cameraStateRef.current);
+        if (!sameModel) fitImportedView(camera, bounds, cameraStateRef.current);
       }
       if (root) { scene.add(root); importedRootRef.current = root; }
+      updateImportedSelection();
       setSceneStatus(null);
       invalidatorRef.current?.();
     };
@@ -714,6 +741,8 @@ export function BuilderCanvas({
       }
     };
   }, [imported, buildAttempt, forceCompatibility]);
+
+  useEffect(() => { updateImportedSelection(); }, [selectedId]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -832,7 +861,8 @@ export function BuilderCanvas({
       const raycaster = makeRay(point);
       const root = brickRootRef.current;
       if (!raycaster || !root) return null;
-      const brickMeshes = root.children.filter(
+      importedRootRef.current?.updateMatrixWorld(true);
+      const brickMeshes = [...root.children, ...(importedRootRef.current?.children ?? [])].filter(
         (child): child is Mesh =>
           child instanceof Mesh &&
           (typeof child.userData.brickId === "string" ||
@@ -840,6 +870,9 @@ export function BuilderCanvas({
       );
       const intersections = raycaster.intersectObjects(brickMeshes, false);
       const hit = intersections[0];
+      const software = softwareSceneRef.current;
+      const softwareHit = software ? pickSoftwareInstance(raycaster.ray, software, importedOffsetRef.current) : null;
+      if (softwareHit && (!hit || softwareHit.point.distanceTo(raycaster.ray.origin) < hit.distance)) return softwareHit;
       if (!hit) return null;
       let id = hit.object.userData.brickId as string | undefined;
       if (!id && hit.instanceId !== undefined) {
@@ -896,12 +929,15 @@ export function BuilderCanvas({
         if (hit) {
           current.onSelect(hit.id);
           const brick = current.bricks.find((item) => item.id === hit.id);
-          if (brick) {
+          const instance = current.imported?.instances.find(item => item.id === hit.id);
+          const origin = brick ? { x: brick.x, y: brick.y, z: brick.z } :
+            instance ? { x: instance.matrix[3] / 20, y: -instance.matrix[7] / 20 + importedOffsetRef.current, z: instance.matrix[11] / 20 } : null;
+          if (origin) {
             dragRef.current = {
               id: hit.id,
               pointerId: event.pointerId,
               start: point,
-              origin: { x: brick.x, y: brick.y, z: brick.z },
+              origin,
               moved: false,
               destination: null,
             };
@@ -997,18 +1033,21 @@ export function BuilderCanvas({
       if (pointersRef.current.size === 1) {
         const drag = dragRef.current;
         if (drag?.pointerId === event.pointerId && drag.moved) {
-          if (drag.destination) current.onMove(drag.id, drag.destination);
+          if (drag.destination) {
+            const imported = current.imported?.instances.some(instance => instance.id === drag.id);
+            current.onMove(drag.id, { ...drag.destination, y: drag.destination.y - (imported ? importedOffsetRef.current : 0) });
+          }
         } else if (current.toolMode === "build" && click && !click.moved) {
           const hit = findBrick(point);
           let destination: Position3 | null = null;
           if (hit) {
             const brick = current.bricks.find((item) => item.id === hit.id);
-            const y = brick ? brick.y + BRICK_HEIGHT : BRICK_HEIGHT;
+            const y = brick ? brick.y + BRICK_HEIGHT : Math.max(0, hit.point.y);
             destination = projectToPlane(point, y);
           } else {
             destination = projectToPlane(point, 0);
           }
-          if (destination) current.onPlace(destination);
+          if (destination) current.onPlace({ ...destination, y: destination.y - importedOffsetRef.current });
         } else if (current.toolMode === "select" && !drag) {
           const hit = findBrick(point);
           current.onSelect(hit?.id ?? null);

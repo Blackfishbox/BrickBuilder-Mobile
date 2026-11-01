@@ -1,12 +1,16 @@
 # BrickBuilder Mobile
 
 A local-first, installable 3D brick-building PWA with a **German application
-interface**. Build with procedural bricks, save projects in your browser,
+interface**. Build with verified LDraw geometry, save projects in your browser,
 install reviewed LDraw parts packages, and import IO, LDR, MPD or internal JSON
 models. No account, paid service or application API is required for the frontend.
 
 Import support is bounded, not a claim of general BrickLink Studio compatibility.
-Imported instances are read-only; editable builder bricks remain separate.
+Imported parts can be selected individually, moved, rotated, recolored and
+deleted with undo/redo and local persistence. The parts picker contains only the
+LDraw library; existing legacy procedural bricks remain supported in saved projects.
+See the [editing guide](artifacts/brickbuilder-mobile/docs/editing.md) for workflows
+and the explicit limitations of edited MPD/IO export.
 See the [application documentation](artifacts/brickbuilder-mobile/README.md)
 for supported formats, verification history and limitations.
 

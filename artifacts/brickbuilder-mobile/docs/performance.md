@@ -7,6 +7,11 @@
 - Share geometry attributes across color variants. Inherited colors use instance
   colors; fixed painted surfaces are batched by opacity with vertex colors.
   Transparent and opaque source colors remain separate.
+- Carry immutable compiled buffers across instance-edit snapshots when the
+  verified source resources are unchanged. Editing one part does not recompile
+  every geometry or deep-copy the original archive. Effective edits rebuild
+  drawing batches cooperatively, keeping the camera and model ground offset
+  fixed; incremental per-instance GPU updates are not yet implemented.
 - Draw explicit edges with one instanced line object per part type, rather than
   one scene object per brick. Conditional type-5 edges remain unsupported.
 - Prepare cold geometry in a Web Worker. Only shared resource files and unique

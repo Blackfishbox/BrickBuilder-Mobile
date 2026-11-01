@@ -24,6 +24,8 @@ export interface ImportedInstance {
 }
 export interface ImportedModel {
   version: 1;
+  /** Effective instances were edited; original source/archive remain untouched. */
+  edited?: boolean;
   format: "io" | "ldr" | "mpd";
   sourceName: string;
   /** Exact original upload, not a publicly shipped fixture. */

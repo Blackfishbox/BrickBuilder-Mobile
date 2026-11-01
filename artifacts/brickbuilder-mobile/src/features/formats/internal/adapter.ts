@@ -23,6 +23,7 @@ const schema = z.object({
   })).max(10000),
   imported: z.object({
     version: z.literal(1), format: z.enum(["io", "ldr", "mpd"]), sourceName: z.string(),
+    edited: z.boolean().optional(),
     originalBytes: z.array(z.number().int().min(0).max(255)).max(32 * 1024 * 1024),
     sourceText: z.string().max(16 * 1024 * 1024), root: z.string(),
     sections: z.record(z.string(), z.array(z.string())),
