@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { COLORS as LDRAW_COLORS } from '@/features/formats/colors';
+import { importDiagnostics } from '@/features/formats/import-diagnostics';
 import { useBuilder } from '@/features/editor/useBuilder';
 import {
   BRICK_DEFINITIONS,
@@ -265,7 +266,7 @@ function App() {
             {editor.partError && !partsOpen && <p role="alert" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm" data-testid="status-part-error">{editor.partError}</p>}
             {editor.imported && (
               <button type="button" className="import-report-button" onClick={() => setFormatsOpen(true)} data-testid="button-import-report">
-                LDraw: {editor.imported.instances.length} Teile · {editor.imported.issues.length} Hinweise / Zuordnungen
+                LDraw: {editor.imported.instances.length} Teile · {importDiagnostics(editor.imported).warnings.length} Importwarnungen
               </button>
             )}
             {editor.brickCount === 0 && (

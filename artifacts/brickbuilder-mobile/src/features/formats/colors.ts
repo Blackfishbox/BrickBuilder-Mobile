@@ -3,7 +3,7 @@ import { LDRAW_COLOR_ROWS, LDRAW_COLOR_SNAPSHOT } from "./ldraw-palette";
 
 // Explicit reviewed subset; numbers from the two namespaces must never be equated.
 // LDraw values: official LDConfig.ldr; BL names/IDs: BrickLink color guide.
-const provenance = "LDraw LDConfig.ldr (https://library.ldraw.org/library/official/LDConfig.ldr); BrickLink color guide (https://www.bricklink.com/catalogColors.asp), reviewed 2026-10-31";
+const provenance = "LDraw LDConfig.ldr (https://library.ldraw.org/library/official/LDConfig.ldr); BrickLink color guide (https://www.bricklink.com/catalogColors.asp), reviewed 2026-11-01";
 const rows: [string, string, string, number, number, string][] = [
   ["0", "Black", "#1B2A34", 255, 11, "Black"],
   ["1", "Blue", "#1E5AA8", 255, 7, "Blue"],
@@ -13,8 +13,11 @@ const rows: [string, string, string, number, number, string][] = [
   ["47", "Trans_Clear", "#FCFCFC", 128, 12, "Trans-Clear"],
   ["72", "Dark_Bluish_Grey", "#646464", 255, 85, "Dark Bluish Gray"],
   ["179", "Pearl_Silver", "#898788", 255, 95, "Flat Silver"],
+  ["288", "Dark_Green", "#00451A", 255, 80, "Dark Green"],
+  ["297", "Pearl_Gold", "#AA7F2E", 255, 115, "Pearl Gold"],
+  ["8", "Dark_Grey", "#545955", 255, 10, "Dark Gray"],
 ];
-// Catalog mappings remain the reviewed eight-record subset. A known LDraw
+// Catalog mappings remain an explicitly reviewed subset. A known LDraw
 // appearance is not evidence of a BrickLink ID, even when the numbers coincide.
 export const COLORS: ResolvedColor[] = LDRAW_COLOR_ROWS.map(([code, name, hex, alpha]) => {
   const ldrawCode = String(code);

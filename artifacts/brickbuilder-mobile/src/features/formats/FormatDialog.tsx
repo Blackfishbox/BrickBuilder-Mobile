@@ -4,6 +4,7 @@ import type { BuilderDocument } from '@/features/editor/model';
 import type { ImportedModel } from './types';
 import { exportModel, importModelFile, validateImportFile } from './adapters';
 import ImportPartNotification from './ImportPartNotification';
+import { importDiagnostics } from './import-diagnostics';
 import { resolveGeometry } from './geometry-resolver';
 import type { GeometryProgress } from './online-geometry';
 import './format-dialog.css';
@@ -30,6 +31,7 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
   const parts = new Set(model.instances.map((i) => i.part.ldrawId)).size;
   const colors = new Set(model.instances.map((i) => i.colorCode)).size;
   const unsupported = model.instances.filter((i) => i.part.status !== 'resolved').length;
+  const { warnings, information } = importDiagnostics(model);
   const groups = new Map<string, { instance: ImportedModel['instances'][number]; count: number }>();
   for (const instance of model.instances) {
     const key = JSON.stringify([instance.reference, instance.colorCode]);
@@ -47,18 +49,30 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
         <div><b>{colors}</b><small>Farben</small></div>
       </div>
       <ImportPartNotification model={model} dismissible={false} />
-      {(model.issues.length > 0 || unsupported > 0) && (
+      {(warnings.length > 0 || unsupported > 0) && (
         <div className="fmt-warn" role="status">
           <AlertTriangle size={15} />
-          <span>{model.issues.length} Hinweise{unsupported ? ` · ${unsupported} Teile nicht vollständig unterstützt` : ''}. Diese Warnungen bleiben im Projekt gespeichert.</span>
+          <span>{warnings.length} Importwarnungen{unsupported ? ` · ${unsupported} Teile nicht vollständig unterstützt` : ''}. Details bleiben im Projekt gespeichert.</span>
         </div>
       )}
-      {model.issues.length > 0 && (
+      {warnings.length > 0 && (
         <details className="fmt-details" open>
-          <summary>Hinweise ({model.issues.length}) <ChevronDown size={14} /></summary>
-          <ul>{model.issues.map((issue, n) => (
+          <summary>Importwarnungen ({warnings.length}) <ChevronDown size={14} /></summary>
+          <ul>{warnings.map((issue, n) => (
             <li key={n}><code>{issue.code}</code><span>{issue.message}</span>
               {(issue.reference || issue.count) && <small>{issue.reference ?? ''}{issue.count ? ` · ${issue.count}×` : ''}</small>}
+            </li>
+          ))}</ul>
+        </details>
+      )}
+      {information.length > 0 && (
+        <details className="fmt-details" data-testid="import-catalog-information">
+          <summary>Katalog- und Formatinformationen ({information.length}) <ChevronDown size={14} /></summary>
+          <p className="fmt-muted">Diese Informationen sind keine Meldungen über ungültige LEGO-Teile, fehlende Geometrie oder falsche Farben. Tatsächliche Importprobleme werden separat angezeigt.</p>
+          <ul>{information.map((issue, index) => (
+            <li key={index}><span>{issue.message}</span>
+              {issue.code === 'missing-bl-part' && <small>LDraw-Teile ohne bestätigte BrickLink-Zuordnung: {[...new Set(model.instances.filter(instance => !instance.part.brickLinkId).map(instance => instance.part.ldrawId))].join(', ')}</small>}
+              {issue.reference && <small>LDraw {issue.reference}</small>}
             </li>
           ))}</ul>
         </details>
@@ -89,7 +103,7 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
         ))}</ul>
       </details>
       <p className="fmt-muted">Quelldaten werden unverändert im Projekt aufbewahrt ({Object.keys(model.resources ?? {}).length} Ressourcen).</p>
-      {model.edited && <p className="fmt-muted">Bearbeitetes Modell: LDR, MPD und der minimale IO-Export verwenden die aktuellen Einzelteile als flache Struktur. Die ursprüngliche Hierarchie, Quelldaten und unbekannte Metadaten bleiben vollständig in der JSON-Projektsicherung erhalten; eine vollständige Studio-Rückwärtskompatibilität ist nicht zugesichert.</p>}
+      <p className="fmt-muted">LDR exportiert flache Einzelteile ohne eingebettete Geometrie. MPD und minimaler IO-Export erhalten darstellbare Untermodellstrukturen und eingebettete LDraw-Abschnitte; einzelne bearbeitete Vorkommen erhalten bei Bedarf eigene Untermodelle. Bei nicht invertierbaren Transformationen werden betroffene Teile auf die oberste Ebene verschoben. Unbekannte LDraw-Befehle bleiben als Text erhalten, werden aber nicht an Änderungen angepasst. Anleitung, LXFML, Texturen, Studio-Geometrie und unbekannte proprietäre Archivdaten werden im minimalen IO nicht übernommen. Originalarchiv und Quelldaten bleiben in der JSON-Sicherung unverändert. Keine zugesicherte Studio-Rückwärtskompatibilität.</p>
       <details className="fmt-details">
         <summary>Geometrie-/Zuordnungsherkunft und Lizenzen <ChevronDown size={14} /></summary>
         <p className="fmt-muted">Originaldateien unverändert; Auswahl und Paketierung durch BrickBuilder. Lizenz pro Datei: CC BY 4.0 oder CC0. Bei dualer Lizenz wird CC BY 4.0 genutzt.</p>

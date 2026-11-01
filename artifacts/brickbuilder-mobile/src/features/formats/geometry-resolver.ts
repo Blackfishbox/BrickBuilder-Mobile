@@ -163,7 +163,7 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
       d.name === doc.name && d.sourceUrl === doc.sourceUrl && d.content === doc.content) === index);
   refreshModelColors(model);
   const unmapped = new Set(model.instances.filter(i => !i.part.brickLinkId).map(i => i.reference)).size;
-  if (unmapped) model.issues.push({ code: "missing-bl-part", count: unmapped, message: `${unmapped} verschiedene Teile ohne bestätigte BrickLink-Teilenummer. LDraw-Nummern werden nicht als BrickLink-Nummern ausgegeben.` });
+  if (unmapped) model.issues.push({ code: "missing-bl-part", count: unmapped, message: `Für ${unmapped} Teilearten fehlt unserer App noch eine bestätigte BrickLink-Katalogzuordnung. Das bedeutet nicht, dass diese LEGO-Teile ungültig sind oder ihre LDraw-Geometrie fehlt. LDraw- und BrickLink-Teilenummern bleiben getrennt.` });
   if (Object.values(model.resources).some(f => /!TEXMAP/.test(f.content))) model.issues.push({ code: "textures", message: "LDraw-TEXMAP-Texturen werden nicht dargestellt; Basisflächen bleiben sichtbar." });
   if (options.signal?.aborted) model.issues.push({ code: "geometry-cancelled",
     message: "Nachladen abgebrochen. Geprüfte Teile und Originaldaten bleiben in der Vorschau; fehlende Teile können erneut geladen werden." });

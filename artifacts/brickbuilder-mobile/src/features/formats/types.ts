@@ -19,6 +19,8 @@ export interface ImportedInstance {
   colorCode: string;
   matrix: Affine;
   sourcePath: string[];
+  /** Zero-based reference-line indices from root to leaf; distinguishes repeated submodels. */
+  sourceOccurrence?: number[];
   part: { ldrawId: string; studioId?: string; brickLinkId?: string; name?: string; mapping?: PartMappingResult; status: "resolved" | "missing" };
   color?: ResolvedColor;
 }

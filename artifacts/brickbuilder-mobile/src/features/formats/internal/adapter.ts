@@ -28,11 +28,13 @@ const schema = z.object({
     sourceText: z.string().max(16 * 1024 * 1024), root: z.string(),
     sections: z.record(z.string(), z.array(z.string())),
     instances: z.array(z.object({
-      id: z.string(), reference: z.string().max(240).regex(/^[a-z0-9_ /.-]+\.dat$/i), colorCode: z.string().regex(/^(?:\d+|0x2[0-9a-f]{6})$/i), matrix: z.array(finite).length(12),
+      id: z.string(), reference: z.string().max(240).regex(/^[a-z0-9_ /.-]+\.dat$/i), colorCode: z.string().regex(/^(?:\d+|0x2[0-9a-f]{6})$/i),
+      matrix: z.tuple([finite, finite, finite, finite, finite, finite, finite, finite, finite, finite, finite, finite]),
       sourcePath: z.array(z.string()),
+      sourceOccurrence: z.array(z.number().int().nonnegative()).max(49).optional(),
       part: z.object({ ldrawId: z.string(), studioId: z.string().optional(), brickLinkId: z.string().optional(), name: z.string().optional(), mapping: mappingResultSchema.optional(), status: z.enum(["resolved", "missing"]) }),
       color: color.optional(),
-    })).max(10000),
+    }).passthrough()).max(10000),
     issues: z.array(z.object({ code: z.string(), message: z.string(), reference: z.string().optional(), count: z.number().optional() })),
     resources: z.record(z.string().regex(/^(parts|p)\/[a-z0-9_/-]+\.dat$/), z.object({
       path: z.string(), sourceUrl: z.string(), author: z.string(), license: z.enum(["CC-BY-4.0", "CC0-1.0"]), content: z.string().max(4 * 1024 * 1024),
@@ -45,7 +47,7 @@ const schema = z.object({
       legalDocuments: z.array(legalDocument),
     })).optional(),
     legalDocuments: z.array(legalDocument),
-  }).optional(),
+  }).passthrough().optional(),
 });
 export function importInternal(bytes: Uint8Array): BuilderDocument {
   const parsed = schema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));

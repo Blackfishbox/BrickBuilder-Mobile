@@ -77,6 +77,7 @@ export function placePreparedPart(document: BuilderDocument, prepared: PreparedP
     ...prepared.model.instances[0], id: `ldraw:${crypto.randomUUID()}`, colorCode, color: resolveColor(colorCode),
     matrix: [1, 0, 0, Math.round(position.x * 2) / 2 * 20, 0, 1, 0, -(position.y - prepared.bottom) * 20, 0, 0, 1, Math.round(position.z * 2) / 2 * 20],
     sourcePath: ["BrickBuilder"],
+    sourceOccurrence: undefined,
   };
   const legalDocuments = [...(original?.legalDocuments ?? [])];
   for (const legal of prepared.model.legalDocuments) {

@@ -43,7 +43,7 @@ export function parseLDraw(text: string) {
   if (Object.keys(sections).length > 1024) throw new Error("Zu viele Untermodelle.");
   const issues: ImportIssue[] = [];
   const instances: ImportedInstance[] = [];
-  function expand(name: string, parent: Affine, color: string, path: string[]) {
+  function expand(name: string, parent: Affine, color: string, path: string[], occurrence: number[]) {
     if (path.includes(name)) throw new Error(`Zyklische Untermodellreferenz: ${name}`);
     if (path.length > 48) throw new Error("Untermodellhierarchie zu tief.");
     const sourcePath = [...path, name];
@@ -59,18 +59,19 @@ export function parseLDraw(text: string) {
       const effectiveColor = ref.color === "16" ? color : ref.color;
       const matrix = multiply(parent, ref.matrix);
       const key = ref.reference.toLowerCase();
-      if (Object.hasOwn(sections, key)) expand(key, matrix, effectiveColor, sourcePath);
+      if (Object.hasOwn(sections, key)) expand(key, matrix, effectiveColor, sourcePath, [...occurrence, index]);
       else {
         if (instances.length >= 10000) throw new Error("Maximal 10.000 Teileinstanzen.");
         instances.push({
           id: crypto.randomUUID(), reference: ref.reference, colorCode: effectiveColor, matrix,
           sourcePath: [...sourcePath, String(index + 1)],
+          sourceOccurrence: [...occurrence, index],
           part: { ldrawId: ref.reference.replace(/\.dat$/i, ""), status: "missing" },
         });
       }
     }
   }
-  expand(root, IDENTITY, "16", []);
+  expand(root, IDENTITY, "16", [], []);
   if (!instances.length) throw new Error("Das Modell enthält keine Teileinstanzen.");
   return { root, sections, instances, issues };
 }

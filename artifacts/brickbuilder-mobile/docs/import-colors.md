@@ -10,8 +10,27 @@ The application now bundles 320 color appearances from a deliberate official
 `LDConfig.ldr` snapshot, available without a network request. Control codes 16
 (inherit current color) and 24 (edge color) are not ordinary material colors.
 The raw source codes remain LDraw codes and are never reinterpreted as BrickLink
-numbers. The eight previously reviewed BrickLink color mappings remain separate;
+numbers. Explicitly reviewed BrickLink color mappings remain separate;
 adding an RGB value does not invent a catalog mapping.
+
+The reviewed mapping subset now contains eleven entries. The following factual
+identifiers were checked against the official
+[BrickLink color guide](https://www.bricklink.com/catalogColors.asp) on
+2026-11-01; LDraw appearance still comes from the independent LDConfig snapshot:
+
+| LDraw code | LDraw name | BrickLink ID | BrickLink name |
+| --- | --- | --- | --- |
+| 288 | Dark_Green | 80 | Dark Green |
+| 297 | Pearl_Gold | 115 | Pearl Gold |
+| 8 | Dark_Grey | 10 | Dark Gray |
+
+Missing confirmed cross-catalog mappings and general IO feature-scope notes are
+shown in a separate, collapsed **Katalog- und Formatinformationen** section.
+They do not mean ordinary LEGO content is invalid, absent or incorrectly colored.
+Real missing geometry, unknown appearance codes and conflicting evidence remain
+import warnings. The same classification applies to older saved issue codes.
+Unconfirmed part numbers are not guessed, and no wholesale BrickLink catalog
+or proprietary Studio resources are bundled.
 
 Resolved colors and obsolete color warnings are refreshed when opening older
 projects, including internal JSON imports. This changes derived appearance and

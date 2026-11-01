@@ -21,7 +21,7 @@ export function refreshModelColors(model: ImportedModel): void {
     });
     else if (color.brickLinkId === undefined) model.issues.push({
       code: "missing-bl-color", reference: code,
-      message: `Für ${color.name} (LDraw ${code}) ist keine bestätigte BrickLink-Farbnummer hinterlegt.`,
+      message: `${color.name} (LDraw ${code}) wird mit bekannter LDraw-Farbe dargestellt. Unserer App fehlt lediglich die bestätigte BrickLink-Katalogzuordnung; dies ist kein Farb- oder Importfehler.`,
     });
   }
   const name = "LDraw color snapshot provenance";
