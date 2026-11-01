@@ -11,6 +11,35 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /ldraw/file:
+    get:
+      operationId: getLDrawFile
+      tags: [geometry]
+      summary: Read an approved original LDraw file
+      description: Fixed official source only. Exact source bytes, without HTTP content encoding. Optional operator-approved archive takes precedence.
+      parameters:
+        - in: query
+          name: path
+          required: true
+          schema:
+            type: string
+            maxLength: 180
+      responses:
+        "200":
+          description: Exact original bytes; X-LDraw-SHA256 and X-LDraw-Snapshot identify the source
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid normalized path
+        "404":
+          description: File unavailable
+        "429":
+          description: Rate limited; Retry-After is provided
+        "502":
+          description: Unsafe, oversized or unavailable upstream response
   /healthz:
     get:
       operationId: healthCheck

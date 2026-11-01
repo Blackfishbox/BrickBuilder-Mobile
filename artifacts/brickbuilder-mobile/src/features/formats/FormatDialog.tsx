@@ -4,6 +4,8 @@ import type { BuilderDocument } from '@/features/editor/model';
 import type { ImportedModel } from './types';
 import { exportModel, importModelFile } from './adapters';
 import ImportPartNotification from './ImportPartNotification';
+import { resolveGeometry } from './geometry-resolver';
+import type { GeometryProgress } from './online-geometry';
 import './format-dialog.css';
 
 type ExportFormat = 'json' | 'ldr' | 'mpd' | 'io';
@@ -21,6 +23,7 @@ interface Props {
   document: BuilderDocument;
   onClose(): void;
   onImport(document: BuilderDocument): Promise<void>;
+  onResolved?(id: string, model: ImportedModel): Promise<void>;
 }
 
 export function Report({ model, bricks }: { model?: ImportedModel; bricks: number }) {
@@ -93,17 +96,18 @@ export function Report({ model, bricks }: { model?: ImportedModel; bricks: numbe
         <ul>{Object.values(model.resources).map(file => (
           <li key={file.path}><a href={file.sourceUrl} target="_blank" rel="noreferrer">{file.path}</a>
             <span>{file.author} · {file.license}</span>
+            {file.sha256 && <small style={{ overflowWrap: 'anywhere' }}>Quell-SHA-256: {file.sha256}<br />{file.retrievalSource}</small>}
           </li>
         ))}</ul>
-        {model.legalDocuments.map(doc => (
-          <details key={doc.name}><summary>{doc.name}</summary><pre style={{ whiteSpace: 'pre-wrap', fontSize: 10 }}>{doc.content}</pre></details>
+        {model.legalDocuments.map((doc, index) => (
+          <details key={`${doc.name}-${index}`}><summary>{doc.name}</summary><pre style={{ whiteSpace: 'pre-wrap', fontSize: 10 }}>{doc.content}</pre></details>
         ))}
       </details>
     </div>
   );
 }
 
-export default function FormatDialog({ document, onClose, onImport }: Props) {
+export default function FormatDialog({ document, onClose, onImport, onResolved }: Props) {
   const [preview, setPreview] = useState<BuilderDocument | null>(null);
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -112,6 +116,9 @@ export default function FormatDialog({ document, onClose, onImport }: Props) {
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [exportError, setExportError] = useState('');
   const token = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  const [progress, setProgress] = useState<GeometryProgress | null>(null);
+  useEffect(() => () => { controller.current?.abort(); token.current++; }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !creating) onClose(); };
@@ -121,6 +128,9 @@ export default function FormatDialog({ document, onClose, onImport }: Props) {
 
   const pick = async (file: File | undefined) => {
     const id = ++token.current;
+    controller.current?.abort();
+    const operation = new AbortController(); controller.current = operation;
+    setProgress(null);
     setPreview(null); setError(''); setBusy(false);
     if (!file) return;
     setFileName(file.name);
@@ -128,10 +138,31 @@ export default function FormatDialog({ document, onClose, onImport }: Props) {
     if (file.size > MAX_BYTES) { setError('Datei ist größer als 32 MiB.'); return; }
     setBusy(true);
     try {
-      const doc = await importModelFile(file);
+      const doc = await importModelFile(file, { signal: operation.signal,
+        onProgress: value => { if (id === token.current) setProgress(value); } });
       if (id === token.current) setPreview(doc);
     } catch (e) {
       if (id === token.current) setError(e instanceof Error ? e.message : 'Datei konnte nicht gelesen werden.');
+    } finally { if (id === token.current) setBusy(false); }
+  };
+
+  const retryGeometry = async () => {
+    const source = preview ?? document;
+    if (!source.imported) return;
+    const id = ++token.current;
+    controller.current?.abort();
+    const operation = new AbortController(); controller.current = operation;
+    setBusy(true); setError(''); setProgress(null);
+    try {
+      // Work on a detached model; quota errors or cancellation cannot mutate the open project.
+      const model = structuredClone(source.imported);
+      await resolveGeometry(model, { signal: operation.signal, retry: true,
+        onProgress: value => { if (id === token.current) setProgress(value); } });
+      if (id !== token.current) return;
+      if (preview) setPreview({ ...source, imported: model });
+      else if (onResolved) await onResolved(source.id, model);
+    } catch (e) {
+      if (id === token.current) setError(e instanceof Error ? e.message : 'Geometrie konnte nicht geladen werden.');
     } finally { if (id === token.current) setBusy(false); }
   };
 
@@ -173,7 +204,12 @@ export default function FormatDialog({ document, onClose, onImport }: Props) {
             <span><b>{fileName || 'Datei auswählen'}</b><small>IO, LDR, MPD oder JSON · max. 32 MiB</small></span>
             <input type="file" accept=".io,.ldr,.mpd,.json" disabled={creating} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ''; }} data-testid="input-import-file" />
           </label>
-          {busy && <div className="fmt-loading" role="status"><LoaderCircle className="spin" size={15} /> Datei wird geprüft …</div>}
+          {busy && <div className="fmt-loading" role="status" style={{ flexWrap: 'wrap' }}>
+            <LoaderCircle className="spin" size={15} />
+            <span>{progress ? `Teile prüfen: ${progress.roots}/${progress.total} · ${progress.files} Dateien · ${(progress.bytes / 1024 / 1024).toFixed(1)} MiB geladen` : 'Datei wird geprüft …'}
+              {progress?.reference && <small style={{ display: 'block', overflowWrap: 'anywhere' }}>LDraw {progress.reference}</small>}</span>
+            <button type="button" onClick={() => controller.current?.abort()} data-testid="button-cancel-geometry">Nachladen abbrechen</button>
+          </div>}
           {error && <div className="fmt-error" role="alert" data-testid="status-import-error">{error}</div>}
           {(preview || !busy) && (
             <>
@@ -182,8 +218,12 @@ export default function FormatDialog({ document, onClose, onImport }: Props) {
               {preview && !shown.imported && <p className="fmt-muted">Geprüftes JSON-Projekt: {shown.bricks.length} Steine.</p>}
             </>
           )}
+          {!busy && shown.imported && shown.imported.instances.some(i => i.part.status === 'missing') && (
+            <button type="button" className="confirm-button fmt-create" onClick={() => void retryGeometry()}
+              disabled={creating || (!preview && !onResolved)} data-testid="button-retry-geometry">Fehlende LDraw-Teile erneut laden</button>
+          )}
           {preview && (
-            <button type="button" className="confirm-button fmt-create" onClick={() => void create()} disabled={creating} data-testid="button-create-imported">
+              <button type="button" className="confirm-button fmt-create" onClick={() => void create()} disabled={creating || busy} data-testid="button-create-imported">
               {creating ? <><LoaderCircle className="spin" size={15} /> Wird angelegt …</> : 'Neues Projekt aus Import anlegen'}
             </button>
           )}

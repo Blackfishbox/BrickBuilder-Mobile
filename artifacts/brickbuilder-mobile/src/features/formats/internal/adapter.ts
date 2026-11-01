@@ -4,6 +4,11 @@ import { compilePart } from "@/features/engine/ldraw-geometry";
 import { mappingResultSchema } from "@/features/parts/mapping-schema";
 
 const finite = z.number().finite().min(-1e9).max(1e9);
+const legalDocument = z.object({
+  name: z.string(), sourceUrl: z.string(), content: z.string(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), byteLength: z.number().int().nonnegative().optional(),
+  retrievedAt: z.string().optional(), retrievalSource: z.string().optional(),
+});
 const color = z.object({
   ldrawCode: z.string(), name: z.string(), hex: z.string().regex(/^#[0-9a-f]{6}$/i),
   alpha: z.number().min(0).max(255), brickLinkId: z.number().optional(), brickLinkName: z.string().optional(),
@@ -30,8 +35,15 @@ const schema = z.object({
     issues: z.array(z.object({ code: z.string(), message: z.string(), reference: z.string().optional(), count: z.number().optional() })),
     resources: z.record(z.string().regex(/^(parts|p)\/[a-z0-9_/-]+\.dat$/), z.object({
       path: z.string(), sourceUrl: z.string(), author: z.string(), license: z.enum(["CC-BY-4.0", "CC0-1.0"]), content: z.string().max(4 * 1024 * 1024),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(), byteLength: z.number().int().nonnegative().optional(),
+      retrievedAt: z.string().optional(), retrievalSource: z.string().optional(),
     })),
-    legalDocuments: z.array(z.object({ name: z.string(), sourceUrl: z.string(), content: z.string() })),
+    retrievalSnapshots: z.array(z.object({
+      version: z.literal(1), id: z.string(), createdAt: z.string(), roots: z.array(z.string()),
+      graph: z.record(z.string(), z.array(z.string())), files: z.array(z.never()).max(0),
+      legalDocuments: z.array(legalDocument),
+    })).optional(),
+    legalDocuments: z.array(legalDocument),
   }).optional(),
 });
 export function importInternal(bytes: Uint8Array): BuilderDocument {

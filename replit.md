@@ -14,7 +14,8 @@ A local-first 3D brick editor and installable PWA with a German interface.
   writes `artifacts/brickbuilder-mobile/dist/public`.
 - `pnpm run typecheck` / `pnpm run build` cover the whole workspace.
 - The optional API uses its own `PORT` and mounts routes under `/api`.
-  The current frontend makes no application API calls.
+  Imports use its optional same-origin LDraw resolver; editing and cached models
+  do not require it. See the hosting guide for explicit archive approval.
 - PostgreSQL is optional, not a frontend requirement. Database tools/library
   require `DATABASE_URL` only when explicitly used.
 - `pnpm --filter @workspace/api-spec run codegen` regenerates API hooks and

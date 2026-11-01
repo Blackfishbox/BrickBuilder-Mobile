@@ -5,10 +5,12 @@ import {
 import type { Affine, ImportedModel } from "../formats/types";
 import { IDENTITY, multiply, referenceLine } from "../formats/ldraw/parser";
 import { resolveColor } from "../formats/colors";
+import { candidates, normalizeReference } from "@workspace/ldraw-source";
 
 export interface Surface { colorCode: string; positions: number[]; edges: number[] }
 const cache = new WeakMap<ImportedModel, Map<string, Surface[]>>();
 const MAX_VERTICES = 1_500_000;
+export function invalidateGeometry(model: ImportedModel) { cache.delete(model); }
 function point(m: Affine, x: number, y: number, z: number): number[] {
   return [m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7], m[8] * x + m[9] * y + m[10] * z + m[11]];
 }
@@ -16,7 +18,7 @@ function point(m: Affine, x: number, y: number, z: number): number[] {
 export function compilePart(model: ImportedModel, reference: string, color: string): Surface[] {
   let modelCache = cache.get(model);
   if (!modelCache) { modelCache = new Map(); cache.set(model, modelCache); }
-  const key = `${reference.toLowerCase()}|${color}`;
+   const key = `${normalizeReference(reference)}|${color}`;
   const cached = modelCache.get(key);
   if (cached) return cached;
   const surfaces = new Map<string, Surface>();
@@ -30,8 +32,8 @@ export function compilePart(model: ImportedModel, reference: string, color: stri
       const type = tokens[0];
       if (type === "1") {
         const ref = referenceLine(line);
-        const name = ref.reference.toLowerCase();
-        const child = Object.hasOwn(model.resources, `parts/${name}`) ? `parts/${name}` : `p/${name}`;
+        const child = candidates(ref.reference).find(path => Object.hasOwn(model.resources, path));
+        if (!child) throw new Error(`Geometrie fehlt: ${ref.reference}`);
         visit(child, multiply(matrix, ref.matrix), ref.color === "16" ? currentColor : ref.color, [...stack, path]);
       } else if (["2", "3", "4"].includes(type)) {
         const expected = type === "2" ? 6 : type === "3" ? 9 : 12;
@@ -52,7 +54,9 @@ export function compilePart(model: ImportedModel, reference: string, color: stri
       }
     }
   }
-  visit(`parts/${reference.toLowerCase()}`, IDENTITY, color, []);
+   const root = candidates(reference).find(path => Object.hasOwn(model.resources, path));
+   if (!root) throw new Error(`Geometrie fehlt: ${reference}`);
+   visit(root, IDENTITY, color, []);
   const result = [...surfaces.values()];
   modelCache.set(key, result);
   return result;

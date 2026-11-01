@@ -36,6 +36,11 @@ export interface LibraryFile {
   author: string;
   license: "CC-BY-4.0" | "CC0-1.0";
   content: string;
+  /** SHA-256 of the exact acquired UTF-8 bytes, including BOM and line endings. */
+  sha256?: string;
+  byteLength?: number;
+  retrievedAt?: string;
+  retrievalSource?: string;
 }
 
 export interface PackagePayload {
@@ -43,7 +48,10 @@ export interface PackagePayload {
   version: string;
   parts: LibraryPart[];
   files: LibraryFile[];
-  legalDocuments: { name: string; sourceUrl: string; content: string }[];
+  legalDocuments: {
+    name: string; sourceUrl: string; content: string;
+    sha256?: string; byteLength?: number; retrievedAt?: string; retrievalSource?: string;
+  }[];
 }
 
 export interface PackageManifest {

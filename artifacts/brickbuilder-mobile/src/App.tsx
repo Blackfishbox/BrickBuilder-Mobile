@@ -486,7 +486,7 @@ function App() {
           </section>
         </div>
       )}
-      {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} />}
+      {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} onResolved={editor.resolveImportedProject} />}
       {!formatsOpen && (
         <ImportPartNotification key={editor.document.id} model={editor.imported} floating />
       )}

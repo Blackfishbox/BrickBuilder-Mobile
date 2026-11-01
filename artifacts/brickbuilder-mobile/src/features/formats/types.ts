@@ -35,4 +35,15 @@ export interface ImportedModel {
   issues: ImportIssue[];
   resources: Record<string, LibraryFile>;
   legalDocuments: PackagePayload["legalDocuments"];
+  retrievalSnapshots?: RetrievalSnapshot[];
+}
+
+export interface RetrievalSnapshot {
+  version: 1;
+  id: string;
+  createdAt: string;
+  roots: string[];
+  graph: Record<string, string[]>;
+  files: LibraryFile[];
+  legalDocuments: PackagePayload["legalDocuments"];
 }

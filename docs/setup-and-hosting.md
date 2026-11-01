@@ -2,9 +2,11 @@
 
 ## Scope and tested toolchain
 
-This guide hosts the existing standalone browser application, without adding a
-server, cloud sync, accounts or automatic missing-parts downloads.
-The current frontend makes **no application API calls**.
+The editor can run as a standalone static browser application. An optional
+same-origin resolver downloads approved missing LDraw geometry during import;
+it adds no accounts, cloud sync, paid provider, database or API key requirement.
+Static-only hosting keeps local/offline editing and cached models available,
+but cannot download arbitrary missing geometry.
 
 Commands were checked on Linux x86-64 with **Node.js 24.22.1** and
 **pnpm 10.26.1**. Use `node --version` and `pnpm --version` to check your tools.
@@ -45,7 +47,8 @@ merge hook that includes database/backup operations, not the app-only setup.
 | `PORT` | Frontend dev, build and preview | `4173` | Positive TCP port; the config checks it even during a static build |
 | `BASE_PATH` | Frontend dev, build and preview | `/` or `/brickbuilder/` | Public URL path, with leading and trailing `/` |
 | `PORT` | Optional API process | `5000` | Separate API listening port |
-| `DATABASE_URL` | Optional database library/schema tools | Your own PostgreSQL connection | Not used by the current frontend or health-only API route |
+| `LDRAW_APPROVED_DIR` | Optional resolver archive mode | Absolute reviewed archive directory | Uses an immutable official archive instead of live per-file requests |
+| `DATABASE_URL` | Optional database library/schema tools | Your own PostgreSQL connection | Not used by the editor, health route or resolver |
 
 Never put secrets in frontend build variables: browser bundles are public.
 Replit's managed frontend workflow supplies its own `PORT` and `BASE_PATH`.
@@ -74,8 +77,8 @@ on a static host. Do not upload source, `node_modules`, uploads or environment f
 
 The test suite always runs self-authored model/container tests, snapshot
 integrity checks, format roundtrips, storage rollback and offline-reopen
-regressions. Three private-reference cases skip explicitly in a sanitized
-checkout: two in `import.test.ts`, one in `legacy-io.test.ts`. If their original
+regressions. Private-reference cases skip explicitly in a sanitized
+checkout, including archive coverage when its approved archive is absent. If their original
 local uploads exist, those cases run too. Do not publish or obtain private
 models merely to remove those skips. A passing synthetic suite does not prove
 general Studio compatibility.
@@ -163,8 +166,9 @@ or worker files can otherwise request assets from a different release.
 Parts `.bin` files are not precached by the worker. Library packages download
 only on request; the additional reviewed import geometry snapshot loads when
 needed during import. Offline use requires the initial app load and the needed
-resources to finish successfully first. This is not an automatic downloader
-for arbitrary missing references.
+resources to finish successfully first. Complete newly resolved geometry graphs
+and legal texts are saved in IndexedDB and in imported projects; reopening
+does not contact the resolver. A later import can reuse that local cache.
 
 ## Where user data lives
 
@@ -183,11 +187,10 @@ There is no account-based sync or server recovery. Clearing a service-worker
 cache and deleting IndexedDB are different actions; avoid deleting user data
 when troubleshooting stale app assets.
 
-## Optional API and database services
+## Optional LDraw resolver
 
-The repository includes an Express scaffold, but the current frontend does not
-need it. A static host cannot run Express. To run the existing health-only
-service on a Node-capable host:
+The existing Express service exposes `GET /api/ldraw/file?path=parts%2F3004.dat`
+and `/api/healthz`. A static host cannot run Express. On any Node-capable host:
 
 ```sh
 pnpm --filter @workspace/api-server run build
@@ -201,11 +204,117 @@ The API already mounts routes below `/api`; its health endpoint is
 when forwarding (do not strip it or add it twice). Give frontend dev/preview
 and API different ports. Terminate HTTPS at your host/proxy.
 
-The current health route does not import the database module. The optional
+Neither route imports the database module. The optional
 `@workspace/db` library and schema tools require a separately configured
 PostgreSQL `DATABASE_URL` if you choose to use them. Do not provision a database
 for the standalone PWA. Any future server-side feature needs its own
-configuration/security documentation; this guide does not claim such a feature exists.
+configuration/security documentation.
+
+### Development forwarding and production routing
+
+The frontend deliberately calls the **API artifact's** `/api/ldraw/file`, not
+`localhost` and not `${BASE_PATH}api`. `/api` is a sibling service prefix even
+when the editor is mounted below `/brickbuilder/`. On Replit the registered
+artifact proxy already forwards `/api` to the API workflow. Start both managed
+workflows; do not add a second Vite proxy.
+
+For a non-Replit checkout, opening Vite directly on port 4173 provides static-only
+behavior unless a same-origin reverse proxy forwards the API. Run the two
+processes on different ports and use a local nginx server, for example:
+
+```nginx
+server {
+    listen 8081;
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_read_timeout 20s;
+    }
+    location / {
+        proxy_pass http://127.0.0.1:4173;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+Open `http://localhost:8081/`, not the direct Vite port, to test online resolution.
+In production serve `dist/public` with the SPA rules above and forward `/api/`
+to Node **before** the HTML fallback. Preserve the full path, query string,
+`X-LDraw-SHA256`, `X-LDraw-Snapshot` and `Retry-After` headers.
+The route sends `application/octet-stream` with `no-transform` and no
+`Content-Encoding`; do not decompress, recode, or wrap the payload as JSON.
+Hash response bytes through the public route and compare with `X-LDraw-SHA256`.
+Do not set cross-origin access headers on this route.
+
+### Bounded live mode and explicit archive approval
+
+Without `LDRAW_APPROVED_DIR`, the resolver reads only fixed official LDraw URLs
+and the CC0 legal-code URL. It rejects URLs, traversal, arbitrary namespaces,
+redirects, unsupported license headers and malformed geometry. Limits: four
+upstream requests at once, 12-second upstream timeout, 2 MiB per file, 32 MiB
+bounded in-memory cache, negative caching and a global upstream 429
+cooldown. Live mode permits at most **120 upstream requests per hour per process**.
+It is for small gaps, not recursively fetching a large library. A multi-process
+host has a separate budget per process; apply a reverse-proxy rate limit for
+untrusted public traffic if needed.
+
+For large models, explicitly prepare one official archive on the **server**:
+
+```sh
+# Requires Python 3 and curl; intentionally downloads about 140 MiB compressed.
+# Expansion is currently about 500 MiB. Never run this automatically at startup.
+python3 scripts/prepare-ldraw-archive.py --approve-official-download
+
+# Use the printed absolute directory; no database or key is needed.
+LDRAW_APPROVED_DIR=/absolute/path/generated-artifacts/ldraw-approved \
+  PORT=5000 pnpm --filter @workspace/api-server run start
+```
+
+The command records the exact archive SHA-256 and per-file hashes in a versioned
+manifest, preserves original file bytes/credits and downloads the CC0 legal
+code. It rejects duplicate/traversing paths, bounds expansion and refuses
+to overwrite an existing destination. This is an explicit operator approval of
+the official source, not a legal opinion or a signature from LDraw. To inspect
+an already downloaded official archive, add `--archive /path/complete.zip`.
+Review the printed hash and original headers before hosting; never use a private
+Studio archive. Archive mode has **no live fallback** for absent or changed files.
+It serves only the subset requested by the model, never the full archive
+to a phone, and still validates each individual file's accepted license.
+
+Keep archives/generated files outside Git (the default `generated-artifacts`
+directory is excluded from backups and deployment inputs). An ignored local
+archive is not transferred by a source merge or static deployment. On another
+host, prepare/copy your deliberately approved server cache separately and set
+the directory explicitly. Keep old approved directories immutable; choose a
+new output directory for a conscious update. Installed snapshots and saved
+project resources are never silently refreshed.
+
+### Import behavior and failure handling
+
+The German dialog shows checked roots, acquired file count and bytes, offers
+**Nachladen abbrechen**, and allows **Fehlende LDraw-Teile erneut laden** in both
+a preview and an open partial project. Retry respects upstream `Retry-After`.
+Downloading never replaces a project: only the explicit create action commits
+a new import. Re-resolving saves before updating the canvas and retains editable
+bricks, undo/redo history and original source data.
+
+The client allows two requests at once, one limited retry, 3,000 newly requested
+files, 32 MiB per acquisition and 48 dependency levels. Availability requires
+a complete acyclic graph and compiled surfaces for every used color, not merely
+HTTP 200. Missing files, unsupported sources/licenses, cycles, throttling,
+timeouts and malformed files leave the upload intact. Cache writes are atomic;
+quota failures are shown, not treated as successful offline persistence.
+Geometry, hashes, provenance, credits, legal texts and versioned dependency
+manifests travel with saved projects/JSON. Original bytes are not normalized
+before hashing, including BOM and CRLF.
+
+```sh
+pnpm --filter @workspace/api-server test
+```
+
+No full library archive is committed. Measured reference coverage is documented
+in [missing-geometry verification](../artifacts/brickbuilder-mobile/docs/missing-geometry-verification.md).
 
 ## Troubleshooting
 

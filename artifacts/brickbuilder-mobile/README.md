@@ -95,6 +95,24 @@ Details: [IO reference analysis](docs/io-reference-analysis.md),
 [older encrypted IO reference](docs/legacy-io-reference.md).
 The latter reference has significant missing-geometry limitations.
 
+### Automatic missing geometry
+
+Import exhausts model resources, installed packages, the verified IndexedDB cache
+and the bundled snapshot before using the optional same-origin LDraw resolver.
+The dialog shows progress, cancellation and retry. An open partial import can
+be re-resolved without losing editable bricks or original source data. Only
+complete, compiled dependency graphs are cached atomically, with original
+headers, exact-byte SHA-256, source identity and legal texts. No automatic
+snapshot updates or guessed BrickLink IDs are involved.
+
+With the approved official archive, the encrypted 8,590-instance reference
+resolved **487/517 references and 8,536/8,590 instances**; 30 references (54
+instances) remain unavailable. This excludes inline flexible triangle sections
+and does not establish complete Studio equivalence.
+See [verification](docs/missing-geometry-verification.md) and
+[free self-hosted resolver setup](../../docs/setup-and-hosting.md#optional-ldraw-resolver).
+Without that optional service the offline editor and cached geometry still work.
+
 ## Not included
 
 - Placing arbitrary LDraw parts or editing imported instances.

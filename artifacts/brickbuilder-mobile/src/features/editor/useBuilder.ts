@@ -345,11 +345,29 @@ export function useBuilder() {
     await refreshProjects().catch(() => undefined);
   }, [refreshProjects, replaceDocument]);
 
+  const resolveImportedProject = useCallback(async (id: string, model: NonNullable<BuilderDocument["imported"]>) => {
+    const current = historyRef.current.document;
+    if (current.id !== id || current.imported?.sourceText !== model.sourceText) throw new Error("Projekt wurde inzwischen gewechselt.");
+    const updated = { ...current, imported: model, updatedAt: new Date().toISOString() };
+    await saveProject(updated);
+    if (historyRef.current.document.id !== id) return;
+    // Geometry is read-only enrichment; preserve the editable brick undo/redo history.
+    const enrich = (doc: BuilderDocument) => ({ ...doc, imported: model });
+    const next = { document: enrich(historyRef.current.document),
+      past: historyRef.current.past.map(enrich), future: historyRef.current.future.map(enrich) };
+    historyRef.current = next;
+    documentRef.current = next.document;
+    setHistory(next);
+    setSavedAt(updated.updatedAt);
+    setSaveError(null);
+  }, []);
+
   const document = history.document;
   return {
     document,
     imported: document.imported,
     importProject,
+    resolveImportedProject,
     bricks: document.bricks,
     selectedId,
     selectedType,

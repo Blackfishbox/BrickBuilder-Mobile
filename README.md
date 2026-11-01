@@ -50,7 +50,7 @@ optional API services and troubleshooting.
 
 - `artifacts/brickbuilder-mobile/` — React, TypeScript, Vite, Three.js, Dexie and PWA.
 - `artifacts/brickbuilder-mobile/docs/` — architecture, import evidence and licensing.
-- `artifacts/api-server/` — optional Express service; not used by the current frontend.
+- `artifacts/api-server/` — optional same-origin LDraw resolver; no database or API key required.
 - `lib/` — workspace libraries, API contracts and optional database support.
 - `scripts/` — maintenance and sanitized GitHub backup utilities.
 - `artifacts/mockup-sandbox/` — separate development preview; not needed to host the app.
@@ -73,3 +73,12 @@ LDraw resources are separately licensed from application code. See
 [import geometry licensing](artifacts/brickbuilder-mobile/docs/import-geometry-licensing.md)
 and [BrickLink mapping evidence](artifacts/brickbuilder-mobile/docs/bricklink-mapping-licensing.md).
 No endorsement by LEGO, BrickLink or LDraw is claimed.
+
+## Optional missing-part downloads
+
+Import checks the saved model, installed packages, verified local cache and bundled
+snapshot before trying `/api/ldraw/file`. The optional resolver obtains original
+licensed LDraw files and recursive dependencies, not catalog images or guessed
+BrickLink identifiers. Without it the editor, local parts and saved geometry
+still work offline. See [resolver setup](docs/setup-and-hosting.md#optional-ldraw-resolver)
+for free self-hosting, bounded live requests and explicit official-archive approval.

@@ -2,6 +2,7 @@ import Dexie, { type Table } from "dexie";
 
 import type { BuilderDocument } from "@/features/editor/model";
 import type { InstalledPackage, LibraryPart, StoredLibraryFile } from "@/features/parts/types";
+import type { RetrievalSnapshot } from "@/features/formats/types";
 
 interface AppMetadata {
   key: string;
@@ -14,6 +15,7 @@ class BuilderDatabase extends Dexie {
   partPackages!: Table<InstalledPackage, string>;
   libraryParts!: Table<LibraryPart, string>;
   libraryFiles!: Table<StoredLibraryFile, string>;
+  geometrySnapshots!: Table<RetrievalSnapshot, string>;
 
   constructor() {
     super("brickbuilder-mobile");
@@ -28,6 +30,7 @@ class BuilderDatabase extends Dexie {
       libraryParts: "id, packageId, ldrawId, category",
       libraryFiles: "id, packageId",
     });
+    this.version(3).stores({ geometrySnapshots: "id, createdAt" });
   }
 }
 

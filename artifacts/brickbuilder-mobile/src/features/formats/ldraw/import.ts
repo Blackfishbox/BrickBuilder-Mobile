@@ -2,15 +2,16 @@ import { createEmptyDocument } from "@/features/editor/model";
 import type { ImportedModel } from "../types";
 import { parseLDraw } from "./parser";
 import { resolveGeometry } from "../geometry-resolver";
+import type { ResolveOptions } from "../online-geometry";
 
-export async function importLDraw(bytes: Uint8Array, filename: string, format: ImportedModel["format"] = "ldr", originalBytes = bytes) {
+export async function importLDraw(bytes: Uint8Array, filename: string, format: ImportedModel["format"] = "ldr", originalBytes = bytes, options: ResolveOptions = {}) {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   const parsed = parseLDraw(text);
   const imported: ImportedModel = {
     version: 1, format, sourceName: filename, originalBytes: Array.from(originalBytes), sourceText: text,
     ...parsed, resources: Object.create(null), legalDocuments: [],
   };
-  await resolveGeometry(imported);
+  await resolveGeometry(imported, options);
   const document = createEmptyDocument(filename.replace(/\.[^.]+$/, ""));
   document.imported = imported;
   return document;
