@@ -82,6 +82,31 @@ claim. This is not a complete LEGO connection or continuous collision/physics
 engine; the drag path is not collision-swept. Browser checks and container Node
 costs are not physical Android FPS or memory measurements.
 
+### Mobile browser evidence (2026-11-01)
+
+The focused browser pass used a new local project with genuine `3001`/`3003`
+source geometry and off-grid coordinates, at 402×874 and 874×402. The browser
+used the WebGL compatibility/software renderer. Held dragging displayed four
+candidates while IndexedDB still held the original matrix; release saved the
+exact full matrix with translation `[4.6, -48, 3.4]`, unchanged source bytes and
+stable instance IDs. A post-release capture-loss bug found in the pass was fixed
+and regression-tested; the focused continuation confirmed that the visible
+“4 geprüfte Verbindungen” status survives release.
+
+The same continuation confirmed toggle off/on without document edits, reload
+persistence and verified contacts, pointer cancellation without changing the
+matrix/updatedAt/source, and reachable landscape controls. In-memory history
+had reset during the development-server reconnection, so the browser did not
+verify the original unsnapped-to-snapped Undo/Redo transition. Automatic editor
+and persistence tests cover that transition. The continuation verified only
+the control-state change for a recreated same-location history step.
+
+No browser 3,000-part timing/heap measurement or physical Android measurement
+was collected. The large-model numbers above are explicitly container Node
+measurements. The GPU renderer shares the projection-only overlay; its existing
+instance-index tests cover complete matrix changes, while this live browser
+run used software rendering.
+
 ## Implemented safeguards
 
 - Compile each normalized LDraw reference once, independently of its inherited

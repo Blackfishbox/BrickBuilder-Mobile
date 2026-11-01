@@ -16,6 +16,7 @@ import zipfile
 import zlib
 
 PIN = "9b1131fb1991f8c0bfc072325e4e12f6271aba35"
+LDRAW_ARCHIVE_SHA256 = "023083918da2d3697c794fb4267975509584f3611b993095874206a803fa610f"
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--shadow", required=True)
 parser.add_argument("--ldraw-archive", required=True)
@@ -44,6 +45,8 @@ for name in ("LICENSE.md", "README.md", "CONTRIBUTING.md"):
 graph = {}
 rejected = {}
 archive = pathlib.Path(args.ldraw_archive).read_bytes()
+if sha(archive) != LDRAW_ARCHIVE_SHA256:
+    raise SystemExit("Refusing an unaudited LDraw archive; review its licenses and references before changing the pinned hash.")
 with zipfile.ZipFile(args.ldraw_archive) as z:
     for name in sorted(z.namelist()):
         key = name.replace("\\", "/").removeprefix("ldraw/").lower()

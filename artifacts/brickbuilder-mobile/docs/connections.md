@@ -130,9 +130,12 @@ allowed local matching region, not an exemption for an entire part.
 
 This is not a physics, stability, deformation or articulation simulator.
 Narrow-phase tests are limited to 20,000 triangles per part and 100,000
-candidate triangle pairs; exceeding them rejects that snap. Open/non-manifold
-geometry, entirely contained solids and unusual multi-profile interference
-remain limitations of a surface-crossing check. A conservative fallback may
+candidate triangle pairs; exceeding them rejects that snap. A bounded,
+three-direction parity check also rejects enclosed/coincident solids outside
+the mating region without treating one ray through an open seam as proof.
+Open/non-manifold
+geometry and unusual multi-profile interference remain limitations; the
+fallback samples at most 32 face midpoints per body. A conservative fallback may
 refuse valid configurations. No collision check here certifies physical
 manufacturing tolerances, friction, strength or flexible motion.
 

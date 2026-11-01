@@ -1,4 +1,4 @@
-import { Box3, Plane, Triangle, Vector3 } from "three";
+import { Box3, Plane, Ray, Triangle, Vector3 } from "three";
 import type { Affine, ImportedModel } from "../formats/types";
 import { compilePart, type Surface } from "../engine/ldraw-geometry";
 import { matrix4 } from "./description";
@@ -43,6 +43,43 @@ function crossings(a: Triangle, b: Triangle): Vector3[] {
     }
   }
   return points;
+}
+function containedOutsideMating(source: Face[], target: Face[], volumes: Array<(p: Vector3) => boolean>): boolean {
+  const directions = [[0.37139, 0.55709, 0.74278], [-0.613, 0.217, 0.76], [0.433, -0.821, 0.372]].map(v => new Vector3(...v).normalize()), hit = new Vector3();
+  const inside = (point: Vector3, body: Face[]): boolean | null => {
+    // LDraw primitives may have internal coincident faces or small open seams;
+    // one ray's odd parity alone is not sufficient evidence of containment.
+    for (const direction of directions) {
+      const ray = new Ray(point, direction), distances: number[] = [];
+      for (const face of body) {
+        if (!ray.intersectsBox(face.box) || !ray.intersectTriangle(face.triangle.a, face.triangle.b, face.triangle.c, false, hit)) continue;
+        const distance = hit.distanceTo(point);
+        if (distance <= EPS) return null;
+        if (!distances.some(d => Math.abs(d - distance) < EPS)) distances.push(distance);
+      }
+      if (distances.length % 2 === 0) return false;
+    }
+    return true;
+  };
+  // Crossing tests already catch partial penetration. Check disconnected or
+  // entirely enclosed solids too; never treat zero surface crossings as proof
+  // that an overlapping solid is empty. Keep this expensive fallback bounded.
+  for (let i = 0; i < source.length; i += Math.max(1, Math.ceil(source.length / 32))) {
+    const point = source[i].triangle.getMidpoint(new Vector3());
+    if (volumes.some(contains => contains(point))) continue;
+    const targetInside = inside(point, target);
+    if (targetInside === true) return true;
+    if (targetInside === null) {
+      // Coincident surfaces can enclose overlapping solids. Test both sides,
+      // requiring the probe to be inside BOTH bodies, not merely face-touching.
+      const normal = source[i].triangle.getNormal(new Vector3());
+      for (const sign of [-1, 1]) {
+        const probe = point.clone().addScaledVector(normal, sign * EPS * 4);
+        if (!volumes.some(contains => contains(probe)) && inside(probe, source) && inside(probe, target)) return true;
+      }
+    }
+  }
+  return false;
 }
 export function matingVolume(a: Connector, b: Connector): (point: Vector3) => boolean {
   const inverse = matrix4(b.frame).invert(), aToB = matrix4(a.frame).premultiply(inverse);
@@ -102,5 +139,5 @@ export function surfacesObstruct(model: ImportedModel, movingId: string, matrix:
       if (points.some(point => !volumes.some(contains => contains(point)))) return true;
     }
   }
-  return false;
+  return containedOutsideMating(proposed, stationary, volumes) || containedOutsideMating(stationary, proposed, volumes);
 }
