@@ -6,6 +6,7 @@ import { PerspectiveCamera, Vector3 } from "three";
 import { engineFixture } from "./engine-fixtures";
 import type { SoftwareScene } from "./software-scene";
 import BuilderCanvas from "./BuilderCanvas";
+import * as snapping from "./stud-snapping";
 
 const observed = vi.hoisted(() => ({ scene: undefined as SoftwareScene | undefined, preparations: 0 }));
 vi.mock("./software-scene", async importOriginal => {
@@ -89,6 +90,28 @@ describe("frame-coalesced drag transactions", () => {
     expect(destination.y).toBeCloseTo(0);
     expect(observed.scene!.positions).toEqual(original);
     expect(observed.preparations).toBe(1);
+  });
+  it("coalesces connection searches and commits the exact off-grid live preview", async () => {
+    const { onMove, point } = await mount();
+    const snap = vi.spyOn(snapping, "constructionPosition").mockReturnValue({ x: 0.23, y: 2.4, z: 0.17 });
+    pointer("pointerdown", point.x, point.y);
+    for (let n = 1; n <= 20; n++) pointer("pointermove", point.x + n * 4, point.y + 10);
+    expect(snap).not.toHaveBeenCalled();
+    flushFrame();
+    expect(snap).toHaveBeenCalledOnce();
+    pointer("pointerup", point.x + 80, point.y + 10);
+    expect(snap).toHaveBeenCalledOnce();
+    expect(onMove).toHaveBeenCalledOnce();
+    expect(onMove.mock.calls[0][1]).toEqual({ x: 0.23, y: 2.4, z: 0.17 });
+  });
+  it("resolves a pending connection on release even before the next frame", async () => {
+    const { onMove, point } = await mount();
+    const snap = vi.spyOn(snapping, "constructionPosition").mockReturnValue({ x: 0.23, y: 2.4, z: 0.17 });
+    pointer("pointerdown", point.x, point.y);
+    pointer("pointermove", point.x + 80, point.y + 10);
+    pointer("pointerup", point.x + 80, point.y + 10);
+    expect(snap).toHaveBeenCalledOnce();
+    expect(onMove.mock.calls[0][1]).toEqual({ x: 0.23, y: 2.4, z: 0.17 });
   });
   for (const cancellation of ["pointercancel", "lostpointercapture", "multitouch", "project", "blur"]) {
     it(`rolls back ${cancellation} without changing the document`, async () => {

@@ -33,7 +33,7 @@ import { reuseGeometryCache } from "./ldraw-geometry";
 import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
 import { createSoftwareScene, updateSoftwareScene, previewSoftware, restoreSoftware, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { InstanceIndex, instanceIndex } from "./instance-index";
-import { stackedPosition } from "./stacking";
+import { constructionPosition } from "./stud-snapping";
 import { createBuilderLighting } from "./lighting";
 import type { Affine, ImportedModel } from "../formats/types";
 
@@ -82,6 +82,7 @@ interface DragCandidate {
   origin: Position3;
   moved: boolean;
   destination: Position3 | null;
+  needsSnap?: boolean;
   matrix?: Affine;
   planeStart: Position3 | null;
 }
@@ -979,9 +980,22 @@ export function BuilderCanvas({
         } else if (child.userData.isSelectionOutline) child.position.set(brick.x, brick.y, brick.z);
       }
     };
+    const resolveDrag = (drag: DragCandidate) => {
+      if (!drag.destination || !drag.needsSnap) return;
+      if (drag.matrix && propsRef.current.imported) {
+        const offset = importedOffsetRef.current;
+        const position = constructionPosition(propsRef.current.imported, drag.id, { ...drag.destination, y: drag.destination.y - offset });
+        drag.destination = { ...position, y: position.y + offset };
+      } else {
+        drag.destination.x = Math.round(drag.destination.x * 2) / 2;
+        drag.destination.z = Math.round(drag.destination.z * 2) / 2;
+      }
+      drag.needsSnap = false;
+    };
     const queuePreview = (drag: DragCandidate) => {
       pendingPreviewRef.current = () => {
         if (dragRef.current !== drag || !drag.destination) return;
+        resolveDrag(drag);
         const position = drag.destination;
         if (drag.matrix) {
           const matrix = [...drag.matrix] as Affine;
@@ -1119,15 +1133,11 @@ export function BuilderCanvas({
           );
           if (destination) {
             start.destination = {
-              x: Math.round((start.origin.x + destination.x - (start.planeStart?.x ?? start.origin.x)) * 2) / 2,
+              x: start.origin.x + destination.x - (start.planeStart?.x ?? start.origin.x),
               y: start.origin.y,
-              z: Math.round((start.origin.z + destination.z - (start.planeStart?.z ?? start.origin.z)) * 2) / 2,
+              z: start.origin.z + destination.z - (start.planeStart?.z ?? start.origin.z),
             };
-            if (start.matrix && propsRef.current.imported) {
-              const offset = importedOffsetRef.current;
-              const raised = stackedPosition(propsRef.current.imported, start.id, { ...start.destination, y: start.destination.y - offset });
-              start.destination.y = raised.y + offset;
-            }
+            start.needsSnap = true;
             queuePreview(start);
           }
           return;
@@ -1154,6 +1164,7 @@ export function BuilderCanvas({
       if (pointersRef.current.size === 1) {
         const drag = dragRef.current;
         if (drag?.pointerId === event.pointerId && drag.moved) {
+          resolveDrag(drag);
           if (drag.destination) {
             const destination = { ...drag.destination, y: drag.destination.y - (drag.matrix ? importedOffsetRef.current : 0) };
             const changed = drag.destination.x !== drag.origin.x || drag.destination.y !== drag.origin.y || drag.destination.z !== drag.origin.z;

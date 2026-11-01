@@ -58,12 +58,12 @@ export function rotateImported(document: BuilderDocument, id: string): BuilderDo
     return { ...instance, matrix };
   });
 }
-export function moveImported(document: BuilderDocument, id: string, position: Position3): BuilderDocument {
+export function moveImported(document: BuilderDocument, id: string, position: Position3, snapXZ = true): BuilderDocument {
   return editImported(document, id, instance => {
     const matrix = [...instance.matrix] as Affine;
-    matrix[3] = Math.round(position.x * 2) / 2 * 20;
+    matrix[3] = (snapXZ ? Math.round(position.x * 2) / 2 : position.x) * 20;
     matrix[7] = -position.y * 20;
-    matrix[11] = Math.round(position.z * 2) / 2 * 20;
+    matrix[11] = (snapXZ ? Math.round(position.z * 2) / 2 : position.z) * 20;
     return { ...instance, matrix };
   });
 }

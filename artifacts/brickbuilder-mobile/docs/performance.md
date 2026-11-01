@@ -2,22 +2,80 @@
 
 ## Construction height and automatic stacking
 
-- Moving an LDraw part checks its translated world-space bounding box against
+- For parts without reviewed connectors, moving an LDraw part checks its translated world-space bounding box against
   cached bounds of other resolved parts. Overlaps raise the drag preview onto
   the intersected stack; moving away recomputes from the initial drag height.
   The lifted position is committed once on release through the normal undo path.
-- New catalog and inventory placements use the same collision rule. Inventory
+- New catalog and inventory placements use the same construction rules. Inventory
   allocation and the adjusted transform remain a single document commit.
 - Selection actions expose **Höher** / **Tiefer**, in increments of one plate
   (8 LDU / 0.4 studs). Explicit height edits deliberately bypass automatic
   lifting, including downward movement; undo/redo and autosave remain available.
-- Collision volumes are conservative axis-aligned bounds, not exact solid-body
+- Fallback collision volumes are conservative axis-aligned bounds, not exact solid-body
   or connector geometry. Studs, hollow parts, slopes and rotated pieces may leave
   clearance or trigger a lift without a true surface intersection. Unresolved
   geometry cannot provide collision bounds; existing import warnings still apply.
 - Bounds are cached per immutable model/instance; an established drag does not
   recompile geometry. Each pointer update scans cached boxes, so this is not a
   spatial-tree collision engine or a physical Android frame-rate guarantee.
+
+## Reviewed standard stud snapping
+
+The first supported connection family is an upright standard stud-to-underside
+connection. Explicit, first-party descriptions use 20 LDU stud spacing, a top
+body plane at local Y=0, and bottom planes at Y=24 for bricks / Y=8 for plates.
+They are checked against unchanged original geometry in the bundled LDraw
+packages, including actual stud primitive centers and body dimensions.
+
+Supported LDraw IDs:
+
+- Bricks: `3001`, `3002`, `3003`, `3004`, `3005`, `3006`.
+- Plates: `3020`, `3021`, `3022`, `3023` (the official redirect to `3023b`),
+  `3023b`, `3024`, `3710`.
+
+This is twelve bundled part types plus the explicit current `3023b` reference.
+These IDs are LDraw identifiers, not inferred BrickLink mappings. Printed,
+modified and other suffix variants do not automatically inherit this metadata.
+
+### Interaction and validation
+
+- Drag close to a compatible stud (capture radius 0.36 studs). The selected
+  underside socket and target stud centers align in X/Z, with the underside at
+  the target's actual body plane rather than at the stud tip. Bricks therefore
+  stack at 24 LDU and plates at 8 LDU, without a 4 LDU stud-envelope gap.
+- Four upright quarter-turns are supported. Tilt, shear, scale and reflections
+  deliberately use conservative fallback placement, not guessed connectors.
+- A local spatial hash checks nearby bodies and sockets. Candidates intersecting
+  occupied bodies or incompatible studs are rejected. Known studs near underside
+  edges and slightly mismatched support heights are also checked. Compatible
+  bridges and partial attachment are allowed; this is not a stability simulator.
+- A colliding stack can raise the selected part to its free top layer.
+  Unrelated overhead models do not attract it. Moving away releases the
+  temporary connection and recomputes from the user's starting height.
+- Searches and visual previews run at most once per drawing frame, plus a final
+  resolution when releasing before the next frame. They do not change inventory,
+  autosave or history until the single release callback.
+- Catalog and inventory placement use the same resolver. Exact imported
+  connection coordinates survive commit, undo/redo, internal JSON and local
+  storage instead of being rounded back onto the global half-stud grid.
+- Explicit **Höher** / **Tiefer** edits bypass the magnet and preserve X/Z.
+  No network requests or new stored connection schema are required.
+
+### Verification and boundaries
+
+The automated tests cover source-geometry agreement for every listed ID,
+brick/plate heights, rotation, off-grid imported coordinates, occupied layers,
+compatible/incompatible bridges, non-coplanar studs, unknown obstruction geometry,
+release/cancellation, frame coalescing, inventory allocation, undo/redo and
+IndexedDB persistence. A warmed Node run on a 3,000-part synthetic arrangement
+completed 100 local searches in 9.4 ms without compiling geometry again.
+That measures the search only, not GPU rendering, cold setup or physical Android FPS.
+
+Unknown parts keep the earlier conservative fallback. Connector descriptions
+are not yet available for arbitrary LDraw parts, Technic, clips, hinges or
+sideways/upside-down building. This is not a complete LEGO connection or
+continuous collision/physics engine; the drag path itself is not collision-swept.
+The spatial index is cached per immutable model and rebuilt on changed documents.
 
 ## Implemented safeguards
 
