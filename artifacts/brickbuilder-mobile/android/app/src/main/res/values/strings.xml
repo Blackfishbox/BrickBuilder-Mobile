@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BrickBuilder Mobile</string>
+    <string name="title_activity_main">BrickBuilder Mobile</string>
+    <string name="package_name">io.github.blackfishbox.brickbuilder</string>
+    <string name="custom_url_scheme">io.github.blackfishbox.brickbuilder</string>
+</resources>

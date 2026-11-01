@@ -13,6 +13,7 @@ import {
 import { loadProject } from '@/storage/database';
 import { exportModel } from '@/features/formats/adapters';
 import './storage-manager.css';
+import { exportFile } from '@/platform/export-file';
 
 interface Props {
   currentProjectId: string;
@@ -76,10 +77,7 @@ export default function StorageManager({ currentProjectId, onClose, onProjectsCh
       const document = await loadProject(entry.id);
       if (!document) throw new Error('Projekt wurde nicht gefunden.');
       const { bytes, filename, mime } = await exportModel(document, 'json');
-      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
-      const anchor = window.document.createElement('a');
-      anchor.href = url; anchor.download = filename; anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+      await exportFile(bytes, filename, mime);
       if (alive.current) setNotice(`Sicherung „${filename}“ wurde zum Herunterladen bereitgestellt. Bitte prüfe die Datei.`);
     } catch (error) {
       const text = message(error, 'Export fehlgeschlagen.');

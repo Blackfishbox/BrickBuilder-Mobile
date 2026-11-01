@@ -36,6 +36,9 @@ function retryDelay(value: string | null) {
 /** Same-origin API artifact path; never infer a geometry ID from a catalog ID. */
 async function transport(path: string) {
   normalizePath(path);
+  if (import.meta.env.VITE_NATIVE_ANDROID === "true") {
+    throw new DownloadError(`LDraw ${path}: nicht im lokalen Android-Teilepaket vorhanden. Es wird kein externer Modellserver verwendet.`, 404);
+  }
   const cachedError = negative.get(path);
   if (cachedError && cachedError.until > Date.now()) throw cachedError;
   const shared = inflight.get(path);

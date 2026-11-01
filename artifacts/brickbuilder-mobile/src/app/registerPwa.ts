@@ -1,6 +1,6 @@
 import { registerSW } from "virtual:pwa-register";
 
 export function registerPwa(): void {
-  if (!("serviceWorker" in navigator)) return;
+  if (import.meta.env.VITE_NATIVE_ANDROID === "true" || !("serviceWorker" in navigator)) return;
   registerSW({ immediate: true });
 }

@@ -34,6 +34,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      disable: process.env.VITE_NATIVE_ANDROID === 'true',
       registerType: 'autoUpdate',
       includeAssets: ['icons/brickbuilder.svg'],
       manifest: {

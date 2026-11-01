@@ -66,3 +66,16 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Android build output and local signing material.
+**/android/.gradle/
+**/android/**/build/
+**/android/local.properties
+**/android/.idea/
+**/android/app/src/main/assets/public/
+**/android/app/src/main/assets/capacitor.config.json
+**/android/app/src/main/assets/capacitor.plugins.json
+**/android/capacitor-cordova-android-plugins/
+*.jks
+*.keystore
+keystore.properties

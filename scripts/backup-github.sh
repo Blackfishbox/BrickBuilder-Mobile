@@ -20,8 +20,14 @@ esac
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 REPOSITORY="https://github.com/Blackfishbox/BrickBuilder-Mobile.git"
-BRANCH_REF="refs/heads/main"
-TRACKING_REF="refs/brickbuilder-backup/main"
+BACKUP_BRANCH="${BRICKBUILDER_BACKUP_BRANCH:-main}"
+git check-ref-format --branch "$BACKUP_BRANCH" >/dev/null
+if [[ "$(git branch --show-current)" != main && -z "${BRICKBUILDER_BACKUP_BRANCH:-}" ]]; then
+  echo "Set BRICKBUILDER_BACKUP_BRANCH explicitly when working outside main." >&2
+  exit 2
+fi
+BRANCH_REF="refs/heads/$BACKUP_BRANCH"
+TRACKING_REF="refs/brickbuilder-backup/$BACKUP_BRANCH"
 export GIT_TERMINAL_PROMPT=0
 PENDING_STATUS="$ROOT/.local/github-backup-pending.json"
 
@@ -61,7 +67,8 @@ for (const name of [...new Set(candidates)].sort()) {
   const base = path.posix.basename(name);
   if (segments.some(segment => excludedDirectories.has(segment))) continue;
   if (/^\.env(?:\.|$)/i.test(base) && base !== ".env.example") continue;
-  if (/\.(?:io|pem|p12|pfx|key|tsbuildinfo)$/i.test(base)) continue;
+  if (/\.(?:io|pem|p12|pfx|key|jks|keystore|tsbuildinfo)$/i.test(base)) continue;
+  if (base === "keystore.properties" || base === "local.properties") continue;
   if (/^(?:id_rsa|id_ed25519|credentials(?:\..*)?)$/i.test(base)) continue;
   let info;
   try { info = fs.lstatSync(name); }
@@ -115,6 +122,15 @@ git read-tree --empty
 git add -f --pathspec-from-file="$TEMP_DIRECTORY/paths" --pathspec-file-nul
 TREE=$(git write-tree)
 PARENT_ARGUMENTS=()
+if [[ -z "$REMOTE_COMMIT" && -n "${BRICKBUILDER_BACKUP_BASE:-}" ]]; then
+  BASE=$(git rev-parse --verify "${BRICKBUILDER_BACKUP_BASE}^{commit}")
+  VERIFIED_MAIN=$(timeout 25s git -c credential.interactive=never ls-remote "$REPOSITORY" refs/heads/main | awk 'NR == 1 { print $1 }')
+  if [[ "$BACKUP_BRANCH" == main || "$BASE" != "$VERIFIED_MAIN" ]]; then
+    echo "New backup branches must fork from the currently verified sanitized main commit." >&2
+    exit 1
+  fi
+  PARENT_ARGUMENTS=(-p "$BASE")
+fi
 if [[ -n "$REMOTE_COMMIT" ]]; then
   PREVIOUS_TREE=$(git show -s --format=%T "$REMOTE_COMMIT")
   if [[ "$TREE" == "$PREVIOUS_TREE" ]]; then

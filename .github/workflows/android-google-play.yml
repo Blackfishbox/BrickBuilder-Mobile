@@ -1,0 +1,132 @@
+name: Build Android APK and Play bundle
+
+on:
+  push:
+    branches: [android/google-play]
+    tags: ["android-play-v*"]
+  workflow_dispatch:
+    inputs:
+      catalog_url:
+        description: "HTTPS URL of the reviewed catalog.bin (public licensed data, not model uploads)"
+        required: true
+        type: string
+      version_code:
+        description: "Unique increasing Play version code (1..2100000000)"
+        required: true
+        default: "1"
+        type: string
+      version_name:
+        description: "Displayed version, e.g. 0.1.0"
+        required: true
+        default: "0.1.0"
+        type: string
+      signed_release:
+        description: "Sign APK/AAB with upload-key secrets in the google-play-signing environment"
+        required: true
+        default: false
+        type: boolean
+
+# This workflow builds downloadable artifacts only. It never publishes to Play.
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}-${{ inputs.signed_release }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    if: ${{ inputs.catalog_url != '' || vars.ANDROID_CATALOG_URL != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment: ${{ (inputs.signed_release || startsWith(github.ref, 'refs/tags/android-play-v')) && 'google-play-signing' || 'android-build' }}
+    env:
+      BRICKBUILDER_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
+      BRICKBUILDER_VERSION_NAME: ${{ inputs.version_name || vars.ANDROID_VERSION_NAME || '0.1.0' }}
+      ANDROID_SIGNED_RELEASE: ${{ inputs.signed_release || startsWith(github.ref, 'refs/tags/android-play-v') }}
+      ANDROID_CATALOG_PATH: ${{ github.workspace }}/generated-artifacts/android-inputs/catalog.bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install reviewed lockfile dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate version and catalog URL
+        env:
+          CATALOG_URL: ${{ inputs.catalog_url || vars.ANDROID_CATALOG_URL }}
+        run: |
+          node --input-type=module <<'JS'
+          const code = process.env.BRICKBUILDER_VERSION_CODE;
+          const name = process.env.BRICKBUILDER_VERSION_NAME;
+          if (!/^[1-9][0-9]{0,9}$/.test(code) || Number(code) > 2100000000) throw Error("Invalid version code");
+          if (!/^[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.]+)?$/.test(name)) throw Error("Invalid version name");
+          if (!process.env.CATALOG_URL) throw Error("Set repository variable ANDROID_CATALOG_URL to the reviewed offline catalog asset URL; see docs/android-google-play.md.");
+          const url = new URL(process.env.CATALOG_URL);
+          if (url.protocol !== "https:" || url.username || url.password) throw Error("Use a public HTTPS catalog URL without credentials");
+          JS
+          mkdir -p generated-artifacts/android-inputs
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --max-time 180 --max-filesize 2180181 "$CATALOG_URL" -o "$ANDROID_CATALOG_PATH"
+      - name: Check types and regressions
+        run: |
+          pnpm run typecheck:libs
+          pnpm --filter @workspace/brickbuilder-mobile typecheck
+          pnpm --filter @workspace/brickbuilder-mobile exec vitest run src/platform src/features/engine/camera-gesture.test.ts src/features/connections/standard-plates.test.ts
+      - name: Build and synchronize local Android assets
+        run: pnpm --filter @workspace/brickbuilder-mobile android:prepare
+      - name: Install Android build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Restore upload key
+        if: env.ANDROID_SIGNED_RELEASE == 'true'
+        env:
+          UPLOAD_KEY_BASE64: ${{ secrets.ANDROID_UPLOAD_KEY_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          test -n "$UPLOAD_KEY_BASE64" && test -n "$ANDROID_UPLOAD_STORE_PASSWORD" \
+            && test -n "$ANDROID_UPLOAD_KEY_ALIAS" && test -n "$ANDROID_UPLOAD_KEY_PASSWORD" \
+            || { echo "Configure all four upload-key secrets before requesting a signed release."; exit 1; }
+          umask 077
+          printf '%s' "$UPLOAD_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/brickbuilder-upload.jks"
+      - name: Build debug APK and unsigned AAB
+        if: env.ANDROID_SIGNED_RELEASE != 'true'
+        working-directory: artifacts/brickbuilder-mobile/android
+        run: bash gradlew --no-daemon assembleDebug bundleRelease lintRelease
+      - name: Build signed release APK and AAB
+        if: env.ANDROID_SIGNED_RELEASE == 'true'
+        working-directory: artifacts/brickbuilder-mobile/android
+        env:
+          ANDROID_REQUIRE_SIGNING: "true"
+          ANDROID_UPLOAD_STORE_FILE: ${{ runner.temp }}/brickbuilder-upload.jks
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          bash gradlew --no-daemon assembleRelease bundleRelease lintRelease
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify app/build/outputs/apk/release/app-release.apk
+      - name: Upload APK and AAB (unsigned AAB is NOT Play-uploadable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: brickbuilder-${{ env.ANDROID_SIGNED_RELEASE == 'true' && 'signed-release' || 'debug-apk-unsigned-aab' }}-${{ env.BRICKBUILDER_VERSION_CODE }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            artifacts/brickbuilder-mobile/android/app/build/outputs/apk/**/*.apk
+            artifacts/brickbuilder-mobile/android/app/build/outputs/bundle/**/*.aab
+            artifacts/brickbuilder-mobile/android/app/build/reports/lint-results-release.html
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/brickbuilder-upload.jks"

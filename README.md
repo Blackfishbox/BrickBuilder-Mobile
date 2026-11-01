@@ -1,3 +1,10 @@
+# Android / Google Play branch
+
+Standalone Android preparation is on `android/google-play`.
+See [the Android build and release guide](docs/android-google-play.md) for
+offline coverage, local APK/AAB builds, GitHub Actions and remaining Play
+Console/signing/device-test requirements. This branch does not publish to Play.
+
 # BrickBuilder Mobile
 
 A local-first, installable 3D brick-building PWA with a **German application

@@ -9,6 +9,7 @@ import CatalogPanel from '../catalog/CatalogPanel';
 import { resolveGeometry } from './geometry-resolver';
 import type { GeometryProgress } from './online-geometry';
 import './format-dialog.css';
+import { exportFile } from '@/platform/export-file';
 
 type ExportFormat = 'json' | 'ldr' | 'mpd' | 'io';
 type WithImported = BuilderDocument & { imported?: ImportedModel };
@@ -196,10 +197,7 @@ export default function FormatDialog({ document, onClose, onImport, onResolved }
     setExporting(format); setExportError('');
     try {
       const { bytes, filename, mime } = await exportModel(document, format);
-      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
-      const a = window.document.createElement('a');
-      a.href = url; a.download = filename; a.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+      await exportFile(bytes, filename, mime);
     } catch (e) { setExportError(e instanceof Error ? e.message : 'Export fehlgeschlagen.'); }
     finally { setExporting(null); }
   };

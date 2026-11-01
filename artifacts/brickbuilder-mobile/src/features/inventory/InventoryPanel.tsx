@@ -100,10 +100,11 @@ export default function InventoryPanel({ document, selected, onSelect, onReplace
     } catch (e) { setImportError(e instanceof Error ? e.message : String(e)); }
   };
 
-  const downloadTemplate = () => {
-    const url = URL.createObjectURL(new Blob([CSV_TEMPLATE], { type: 'text/csv' }));
-    const a = window.document.createElement('a'); a.href = url; a.download = 'teileliste-vorlage.csv'; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const downloadTemplate = async () => {
+    try {
+      const { exportFile } = await import('@/platform/export-file');
+      await exportFile(new TextEncoder().encode(CSV_TEMPLATE), 'teileliste-vorlage.csv', 'text/csv');
+    } catch (e) { setImportError(e instanceof Error ? e.message : 'Vorlage konnte nicht gespeichert werden.'); }
   };
 
   const rows = inventory?.rows ?? [];
