@@ -4,6 +4,7 @@ import { IDENTITY, multiply, referenceLine } from "../formats/ldraw/parser";
 import type { Affine, ImportedModel } from "../formats/types";
 import { hierarchyRecords, shadowRecords } from "./dataset";
 import type { Connector, Description, Diagnostic, Family, Section } from "./types";
+import { equivalentPrimitiveHierarchy } from "./hierarchy-equivalence";
 
 export function matrix4(m: Affine): Matrix4 {
   return new Matrix4().set(...m, 0, 0, 0, 1);
@@ -213,6 +214,20 @@ export function describeConnections(reference: string, model?: ImportedModel): D
   const root = resolve(reference);
   const connectors = root ? visit(root, []) : [];
   if (!root) issue(reference, "missing-reference", "Exact reference absent from installed and pinned libraries");
+  if (model && root) {
+    const isStudSocket = (c: Connector) => c.family === "cylinder" && c.gender === "F" && c.caps === "one" &&
+      !c.centered && !c.slide && c.sections.length === 1 && ["R", "S"].includes(c.sections[0].shape) &&
+      c.sections[0].radius === 6 && c.sections[0].length === 4;
+    const canonical = describeConnections(reference).connectors.filter(isStudSocket);
+    const socketKey = (c: Connector) => JSON.stringify([c.frame, c.sections, c.group]);
+    const present = new Set(connectors.filter(isStudSocket).map(socketKey));
+    const missing = canonical.filter(c => !present.has(socketKey(c)));
+    if (missing.length && equivalentPrimitiveHierarchy(reference, model)) {
+      connectors.push(...missing);
+      issue(root, "equivalent-hierarchy-sockets",
+        "Recovered pinned standard stud sockets after verifying identical transformed primitive references in the installed hierarchy");
+    }
+  }
   // Duplicate inherited contacts describe one physical socket, not extra capacity.
   const seen = new Set<string>();
   const result = { connectors: connectors.filter(c => {

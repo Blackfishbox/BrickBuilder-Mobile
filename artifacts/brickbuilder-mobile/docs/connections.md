@@ -183,6 +183,22 @@ current model.
 
 ## Verification
 
+Standard plate regressions explicitly cover 3023/3023b on 3795 (1 x 2 on
+2 x 6), both stud rows, adjacent positions, all four quarter-turns, different
+drag heights and a rotated off-grid support. Other bundled standard plates
+are checked against the same support. The expected result is the complete
+matrix and actual socket contact count, not merely a non-null candidate.
+
+Some older installed or embedded geometries inline references that the pinned
+LDraw hierarchy moved into subparts or stud groups. Such a version mismatch
+previously discarded inherited underside sockets. Missing ordinary stud sockets
+can now be recovered from the pinned metadata only when the installed part's
+transformed primitive-reference multiset exactly matches the pinned hierarchy.
+This is bounded, cached with the description, and fails closed on changed,
+incomplete or cyclic hierarchies. It is not a suffix alias or bounding-box
+inference, and does not modify project geometry or original source bytes.
+The fixture provenance is documented beside the regression source file.
+
 Automatic tests use genuine licensed source fixtures for every enabled family
 and verify source hashes/legal files, inheritance, clears/includes, grids,
 scale/mirror handling, incompatibility, occupied contacts, oriented insertion,
