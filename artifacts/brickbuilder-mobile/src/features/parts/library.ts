@@ -2,6 +2,7 @@ import { z } from "zod";
 import { builderDatabase } from "@/storage/database";
 import catalog from "./catalog.json";
 import type { PackageManifest, PackagePayload, LibraryPart } from "./types";
+import { mappingEvidenceSchema } from "./mapping-schema";
 
 export const PART_PACKAGES = catalog as PackageManifest[];
 const safePath = z.string().regex(/^(parts|p)\/[a-z0-9_/-]+\.dat$/);
@@ -11,6 +12,7 @@ const payloadSchema = z.object({
   parts: z.array(z.object({
     id: z.string(), packageId: z.string(), ldrawId: z.string().regex(/^[a-z0-9_-]+$/),
     name: z.string(), category: z.string(), keywords: z.array(z.string()), file: safePath,
+    mappings: z.array(mappingEvidenceSchema).optional(),
   })),
   files: z.array(z.object({
     path: safePath, sourceUrl: z.string().url(), author: z.string().min(1),
@@ -43,13 +45,25 @@ export function validatePayload(input: unknown, manifest: PackageManifest): Pack
         part.file !== `parts/${part.ldrawId}.dat` || !paths.has(part.file)) {
       throw new Error("Ungültige Teilezuordnung.");
     }
+    for (const evidence of part.mappings ?? []) {
+      const file = payload.files.find(f => f.path === part.file)!;
+      const explicitIds = [...evidence.sourceLine.matchAll(/\bBrickLink\s+([a-z0-9_-]+)/gi)].map(m => m[1]);
+      if (evidence.ldrawId !== part.ldrawId || evidence.sourceUrl !== file.sourceUrl ||
+          evidence.author !== file.author || evidence.license !== file.license ||
+          !/^0 !KEYWORDS /i.test(evidence.sourceLine) ||
+          !file.content.split(/\r?\n/).includes(evidence.sourceLine) ||
+          !explicitIds.includes(evidence.brickLinkId)) throw new Error("Unbelegte BrickLink-Zuordnung.");
+    }
   }
   for (const file of payload.files) {
     const licenseHeader = file.license === "CC-BY-4.0"
       ? "0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt"
       : "0 !LICENSE Licensed under CC0 : see CAreadme.txt";
+    const licensed = file.content.split(/\r?\n/).some(line => line === licenseHeader ||
+      (file.license === "CC-BY-4.0" &&
+       line === "0 !LICENSE Licensed under CC BY 2.0 and CC BY 4.0 : see CAreadme.txt"));
     if (file.sourceUrl !== `https://library.ldraw.org/library/official/${file.path}` ||
-        !file.content.includes(licenseHeader)) throw new Error("Lizenz oder Quelle nicht freigegeben.");
+        !licensed) throw new Error("Lizenz oder Quelle nicht freigegeben.");
     for (const line of file.content.split(/\r?\n/)) {
       if (!/^1\s/.test(line)) continue;
       const ref = line.trim().split(/\s+/).slice(14).join(" ").replaceAll("\\", "/").toLowerCase();
@@ -72,6 +86,14 @@ export async function installPackage(id: string, signal?: AbortSignal): Promise<
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
   if (hash !== manifest.sha256) throw new Error("Die Prüfsumme des Pakets ist ungültig.");
   const payload = validatePayload(JSON.parse(new TextDecoder().decode(bytes)), manifest);
+  for (const part of payload.parts) {
+    for (const evidence of part.mappings ?? []) {
+      const file = payload.files.find(f => f.path === part.file)!;
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(file.content));
+      const actual = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+      if (actual !== evidence.sourceSha256) throw new Error("Zuordnungsquelle: Prüfsumme stimmt nicht.");
+    }
+  }
   signal?.throwIfAborted();
   await builderDatabase.transaction("rw",
     builderDatabase.partPackages, builderDatabase.libraryParts, builderDatabase.libraryFiles, async () => {

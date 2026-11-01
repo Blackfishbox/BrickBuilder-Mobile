@@ -97,7 +97,10 @@ describe("real private Studio reference, geometry, formats and storage", () => {
       .toEqual({ "0": 305, "72": 68, "19": 4, "4": 12, "1": 2, "15": 21, "179": 4, "47": 13 });
     expect(model.originalBytes).toEqual(Array.from(bytes));
     expect(model.instances.every(i => i.color?.brickLinkId !== undefined)).toBe(true);
-    expect(model.instances.every(i => i.part.brickLinkId === undefined && i.part.studioId === undefined)).toBe(true);
+    expect(model.instances.every(i => i.part.studioId === undefined)).toBe(true);
+    expect(new Set(model.instances.filter(i => i.part.brickLinkId).map(i => i.reference)).size).toBe(8);
+    expect(model.instances.find(i => i.reference === "60897.dat")?.part.brickLinkId).toBe("4085d");
+    expect(model.instances.find(i => i.reference === "6141.dat")?.part.brickLinkId).toBe("4073");
     let vertices = 0;
     for (const i of model.instances) {
       if (i.part.status === "resolved") {
@@ -144,12 +147,27 @@ describe("real private Studio reference, geometry, formats and storage", () => {
     expect(reopened.imported?.instances[0].colorCode).toBe("987654");
     expect(reopened.imported?.originalBytes).toEqual(doc.imported?.originalBytes);
   });
+  it("retains conflicting evidence but leaves the BrickLink ID empty independently of geometry", async () => {
+    const { BRICKLINK_EVIDENCE } = await import("../parts/bricklink-evidence");
+    await builderDatabase.libraryParts.put({
+      id: "test:60897", packageId: "test", ldrawId: "60897", name: "Clip", category: "",
+      keywords: [], file: "parts/60897.dat",
+      mappings: [{ ...BRICKLINK_EVIDENCE.find(e => e.ldrawId === "60897")!, brickLinkId: "4085x" }],
+    });
+    const doc = await importLDraw(encode(ref.replace("3001.dat", "60897.dat")), "conflict.ldr");
+    expect(doc.imported?.instances[0].part).toMatchObject({ status: "resolved", mapping: { status: "ambiguous" } });
+    expect(doc.imported?.instances[0].part.brickLinkId).toBeUndefined();
+    expect(doc.imported?.issues.some(i => i.code === "ambiguous-bl-part")).toBe(true);
+    const reopened = importInternal(exportInternal(doc));
+    expect(reopened.imported?.instances[0].part).toEqual(doc.imported?.instances[0].part);
+  });
   it("separates internal JSON/LDR/MPD/minimal IO adapters and roundtrips actual fixture transforms", async () => {
     const doc = await importIO(await referenceBytes(), "ford.io");
     doc.metadata = { extra: { retained: true } };
     const json = importInternal(exportInternal(doc));
     expect(json.metadata).toEqual(doc.metadata);
     expect(json.imported?.sections).toEqual(doc.imported?.sections);
+    expect(json.imported?.instances.map(i => i.part)).toEqual(doc.imported?.instances.map(i => i.part));
     const flat = parseLDraw(new TextDecoder().decode(exportLDR(doc)));
     expect(flat.instances.map(i => [i.reference, i.colorCode, i.matrix])).toEqual(doc.imported!.instances.map(i => [i.reference, i.colorCode, i.matrix]));
     expect(new TextDecoder().decode(exportMPD(doc))).toBe(doc.imported?.sourceText);

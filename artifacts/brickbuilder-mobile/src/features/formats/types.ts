@@ -1,4 +1,4 @@
-import type { LibraryFile, PackagePayload } from "../parts/types";
+import type { LibraryFile, PackagePayload, PartMappingResult } from "../parts/types";
 
 /** Row-major affine 3x4 in original LDraw units, including reflection/shear. */
 export type Affine = [number, number, number, number, number, number, number, number, number, number, number, number];
@@ -19,7 +19,7 @@ export interface ImportedInstance {
   colorCode: string;
   matrix: Affine;
   sourcePath: string[];
-  part: { ldrawId: string; studioId?: string; brickLinkId?: string; name?: string; status: "resolved" | "missing" };
+  part: { ldrawId: string; studioId?: string; brickLinkId?: string; name?: string; mapping?: PartMappingResult; status: "resolved" | "missing" };
   color?: ResolvedColor;
 }
 export interface ImportedModel {

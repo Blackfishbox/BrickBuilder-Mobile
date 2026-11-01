@@ -35,6 +35,7 @@ import {
 import '@/components/mobile/editor.css';
 import PartsLibrary from '@/features/parts/PartsLibrary';
 import FormatDialog from '@/features/formats/FormatDialog';
+import ImportPartNotification from '@/features/formats/ImportPartNotification';
 
 const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   type: type as BrickType,
@@ -486,6 +487,9 @@ function App() {
         </div>
       )}
       {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} />}
+      {!formatsOpen && (
+        <ImportPartNotification key={editor.document.id} model={editor.imported} floating />
+      )}
       <span className="sr-only" data-testid="status-save-message">{saveMessage}</span>
     </main>
   );

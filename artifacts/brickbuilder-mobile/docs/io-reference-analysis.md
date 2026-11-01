@@ -142,3 +142,18 @@ Weiter offen bleiben:
 
 - Bestätigung der sichtbaren Übereinstimmung mit Studio.
 - Physischer Android-Abnahmetest einschließlich Flugmodus und Speicherverdrängung.
+
+## Ergänzung: belegte BrickLink-Teilenummern
+
+Der getrennt lizenzierte Zuordnungsbestand `ldraw-explicit-bricklink`
+(`2026-10-31.1`) belegt acht der 74 Referenzteile anhand ausdrücklicher
+BrickLink-Keywords in den geprüften LDraw-Originalen. Die 66 anderen
+Referenzen und sämtliche Studio-IDs bleiben unbestätigt. Die früheren
+Aussagen über vollständig leere BrickLink-Teilenummern beschreiben den
+Stand vor dieser Ergänzung.
+
+Der Bericht zeigt alle Teil-/Farbkombinationen mit Häufigkeit, Namen,
+Nummern, Varianten, Quellen, Autoren, Lizenz, Quellenhash und Version.
+Widersprüchliche Nachweise ergeben mehrere Kandidaten ohne ausgewählte ID;
+unbekannte Nummern und Originaldaten bleiben erhalten. Details und
+Lizenzabgrenzung: [BrickLink-Zuordnung](bricklink-mapping-licensing.md).

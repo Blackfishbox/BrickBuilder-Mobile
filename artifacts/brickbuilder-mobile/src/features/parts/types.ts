@@ -1,8 +1,29 @@
+/** Separately licensed evidence, not an inference from filenames or geometry. */
+export interface PartMappingEvidence {
+  ldrawId: string;
+  brickLinkId: string;
+  name: string;
+  variant: string;
+  sourceUrl: string;
+  sourceLine: string;
+  sourceSha256: string;
+  author: string;
+  license: "CC-BY-4.0" | "CC0-1.0";
+  mappingSet: string;
+  version: string;
+}
+
+export interface PartMappingResult {
+  status: "confirmed" | "ambiguous" | "unknown";
+  candidates: PartMappingEvidence[];
+}
+
 export interface LibraryPart {
   id: string;
   packageId: string;
   ldrawId: string;
   brickLinkId?: string;
+  mappings?: PartMappingEvidence[];
   name: string;
   category: string;
   keywords: string[];

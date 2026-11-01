@@ -6,6 +6,7 @@ import manifest from "./geometry-manifest.json";
 import { resolveColor } from "./colors";
 import { referenceLine } from "./ldraw/parser";
 import { compilePart } from "../engine/ldraw-geometry";
+import { MAPPING_LEGAL_DOCUMENT, resolvePartMapping } from "../parts/bricklink-evidence";
 
 interface Snapshot {
   files: LibraryFile[];
@@ -55,15 +56,22 @@ export async function resolveGeometry(model: ImportedModel): Promise<void> {
     const matching = model.instances.filter(i => i.reference.toLowerCase() === reference);
     const entry = parts.find(p => `${p.ldrawId.toLowerCase()}.dat` === reference);
     const snapPart = snapshot?.parts.find(p => p.file === `parts/${reference}`);
+    const mapping = resolvePartMapping(reference, parts);
+    const confirmed = mapping.status === "confirmed" ? mapping.candidates[0] : undefined;
     for (const instance of matching) {
       instance.part = {
         ldrawId: instance.part.ldrawId,
         // Studio part namespace is not inferred from the LDraw filename.
-        name: entry?.name ?? snapPart?.name,
-        ...(entry?.brickLinkId ? { brickLinkId: entry.brickLinkId } : {}),
+        name: confirmed?.name ?? entry?.name ?? snapPart?.name,
+        mapping,
+        ...(confirmed ? { brickLinkId: confirmed.brickLinkId } : {}),
         status: error ? "missing" : "resolved",
       };
     }
+    if (mapping.status === "ambiguous") model.issues.push({
+      code: "ambiguous-bl-part", reference, count: matching.length,
+      message: `${reference}: widersprüchliche BrickLink-Nachweise (${[...new Set(mapping.candidates.map(c => c.brickLinkId))].join(", ")}). Keine Teilenummer ausgewählt; Varianten und Quellen im Zuordnungsbericht.`,
+    });
     if (error) model.issues.push({ code: "missing-part", reference, count: matching.length, message: `${reference}: ${error}. Nicht gerendert, Quelldaten erhalten.` });
   }
   for (const path of included) model.resources[path] = available[path];
@@ -82,7 +90,7 @@ export async function resolveGeometry(model: ImportedModel): Promise<void> {
       }
     }
   }
-  model.legalDocuments = [...packages.flatMap(p => p.legalDocuments), ...(snapshot?.legalDocuments ?? [])]
+  model.legalDocuments = [...packages.flatMap(p => p.legalDocuments), ...(snapshot?.legalDocuments ?? []), MAPPING_LEGAL_DOCUMENT]
     .filter((doc, index, all) => all.findIndex(d => d.name === doc.name) === index);
   for (const code of new Set(model.instances.map(i => i.colorCode))) {
     const color = resolveColor(code);

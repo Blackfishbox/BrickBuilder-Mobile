@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizeDocument, type BuilderDocument } from "@/features/editor/model";
 import { compilePart } from "@/features/engine/ldraw-geometry";
+import { mappingResultSchema } from "@/features/parts/mapping-schema";
 
 const finite = z.number().finite().min(-1e9).max(1e9);
 const color = z.object({
@@ -23,7 +24,7 @@ const schema = z.object({
     instances: z.array(z.object({
       id: z.string(), reference: z.string().max(240).regex(/^[a-z0-9_ /.-]+\.dat$/i), colorCode: z.string().regex(/^(?:\d+|0x2[0-9a-f]{6})$/i), matrix: z.array(finite).length(12),
       sourcePath: z.array(z.string()),
-      part: z.object({ ldrawId: z.string(), studioId: z.string().optional(), brickLinkId: z.string().optional(), name: z.string().optional(), status: z.enum(["resolved", "missing"]) }),
+      part: z.object({ ldrawId: z.string(), studioId: z.string().optional(), brickLinkId: z.string().optional(), name: z.string().optional(), mapping: mappingResultSchema.optional(), status: z.enum(["resolved", "missing"]) }),
       color: color.optional(),
     })).max(10000),
     issues: z.array(z.object({ code: z.string(), message: z.string(), reference: z.string().optional(), count: z.number().optional() })),
@@ -41,6 +42,11 @@ export function importInternal(bytes: Uint8Array): BuilderDocument {
     if (Object.values(parsed.imported.resources).reduce((n, f) => n + f.content.length, 0) > 24 * 1024 * 1024) throw new Error("Geometriedaten zu groß.");
     for (const instance of parsed.imported.instances) {
       if (instance.reference.split("/").includes("..") || instance.reference.startsWith("/")) throw new Error("Unsicherer Teilpfad.");
+      const mapping = instance.part.mapping;
+      if (mapping && (
+        mapping.candidates.some(e => `${e.ldrawId}.dat` !== instance.reference.toLowerCase()) ||
+        instance.part.brickLinkId !== (mapping.status === "confirmed" ? mapping.candidates[0].brickLinkId : undefined)
+      )) throw new Error("Teilenummer und gespeicherte Nachweise widersprechen sich.");
       instance.id = crypto.randomUUID();
     }
     // An internal JSON import must be just as safe as an IO import before storage.

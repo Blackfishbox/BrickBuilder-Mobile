@@ -1,0 +1,57 @@
+.import-part-notification {
+  color: #65381b;
+  background: #fff7e9;
+  border: 1px solid #dfb578;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.import-part-notification-floating {
+  position: fixed;
+  z-index: 60;
+  top: calc(65px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 24px));
+  max-height: calc(100dvh - 160px);
+  overflow-y: auto;
+  margin: 0;
+  box-shadow: 0 8px 28px #20332826;
+}
+.import-part-notification-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.import-part-notification-heading > strong { flex: 1; font-size: 14px; }
+.import-part-notification-heading button {
+  flex: 0 0 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.import-part-notification button:focus-visible,
+.import-part-notification ul:focus-visible { outline: 2px solid #96521e; outline-offset: 2px; }
+.import-part-notification p { margin: 4px 0 8px; }
+.import-part-notification ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  max-height: min(26dvh, 180px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.import-part-notification li { padding: 7px 0; border-top: 1px solid #dfb57880; }
+.import-part-notification li > strong,
+.import-part-notification li > span { display: block; }
+.import-part-notification small { font-size: 11px; }

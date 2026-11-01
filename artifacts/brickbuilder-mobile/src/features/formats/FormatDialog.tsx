@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronDown, Download, FileUp, LoaderCircle, X } from 'l
 import type { BuilderDocument } from '@/features/editor/model';
 import type { ImportedModel } from './types';
 import { exportModel, importModelFile } from './adapters';
+import ImportPartNotification from './ImportPartNotification';
 import './format-dialog.css';
 
 type ExportFormat = 'json' | 'ldr' | 'mpd' | 'io';
@@ -22,11 +23,18 @@ interface Props {
   onImport(document: BuilderDocument): Promise<void>;
 }
 
-function Report({ model, bricks }: { model?: ImportedModel; bricks: number }) {
+export function Report({ model, bricks }: { model?: ImportedModel; bricks: number }) {
   if (!model) return <p className="fmt-muted">Dieses Projekt enthält keine importierten Daten.</p>;
   const parts = new Set(model.instances.map((i) => i.part.ldrawId)).size;
   const colors = new Set(model.instances.map((i) => i.colorCode)).size;
   const unsupported = model.instances.filter((i) => i.part.status !== 'resolved').length;
+  const groups = new Map<string, { instance: ImportedModel['instances'][number]; count: number }>();
+  for (const instance of model.instances) {
+    const key = JSON.stringify([instance.reference, instance.colorCode]);
+    const group = groups.get(key);
+    if (group) group.count++;
+    else groups.set(key, { instance, count: 1 });
+  }
   return (
     <div className="fmt-report" data-testid="format-report">
       <div className="fmt-source"><strong>{model.sourceName}</strong><span>{String(model.format).toUpperCase()}</span></div>
@@ -36,6 +44,7 @@ function Report({ model, bricks }: { model?: ImportedModel; bricks: number }) {
         <div><b>{parts}</b><small>Teile</small></div>
         <div><b>{colors}</b><small>Farben</small></div>
       </div>
+      <ImportPartNotification model={model} dismissible={false} />
       {(model.issues.length > 0 || unsupported > 0) && (
         <div className="fmt-warn" role="status">
           <AlertTriangle size={15} />
@@ -53,23 +62,33 @@ function Report({ model, bricks }: { model?: ImportedModel; bricks: number }) {
         </details>
       )}
       <details className="fmt-details">
-        <summary>Zuordnungen ({model.instances.length}) <ChevronDown size={14} /></summary>
-        <ul>{model.instances.slice(0, 400).map((i) => (
+        <summary>Zuordnungen ({groups.size} Teil-/Farbkombinationen) <ChevronDown size={14} /></summary>
+        <p className="fmt-muted">BrickLink-Nachweise stammen aus ausdrücklich genannten LDraw-Schlüsselwörtern, nicht aus Studio. Studio-IDs bleiben ohne gesonderten Beleg leer.</p>
+        <ul>{[...groups.values()].map(({ instance: i, count }) => (
           <li key={i.id} className="fmt-map">
             <i style={{ background: i.color?.hex ?? '#ccc' }} />
-            <span><b>{i.part.name ?? i.reference}</b>
+            <span><b>{i.part.name ?? i.reference} · {count}×</b>
               <small>LDraw {i.part.ldrawId} · BrickLink {i.part.brickLinkId ?? '—'} · Studio {i.part.studioId ?? '—'}</small>
+              <small>Teilezuordnung: {i.part.mapping?.status === 'confirmed' ? 'belegt' : i.part.mapping?.status === 'ambiguous' ? 'mehrdeutig – keine Auswahl' : 'unbestätigt – keine Nummernableitung'}</small>
+              {i.part.mapping?.candidates.map((e, n) => (
+                <small key={n}>
+                  BrickLink {e.brickLinkId} · {e.name} · Variante: {e.variant}<br />
+                  <a href={e.sourceUrl} target="_blank" rel="noreferrer">Quelle: LDraw {e.ldrawId}</a>
+                  {' · '}{e.author} · {e.license} · {e.mappingSet} / {e.version}<br />
+                  Beleg: {e.sourceLine}<br />
+                  <span style={{ overflowWrap: 'anywhere' }}>Quell-SHA-256: {e.sourceSha256}</span>
+                </small>
+              ))}
               <small>Farbe {i.color?.name ?? `Code ${i.colorCode}`} · LDraw {i.color?.ldrawCode ?? i.colorCode} · BrickLink {i.color?.brickLinkName ?? '—'} {i.color?.brickLinkId ?? '—'} · Studio {i.color?.studioId ?? '—'}</small>
               {i.color && <small>Zuordnungsquelle: {i.color.source}</small>}
             </span>
             <em className={`fmt-status s-${i.part.status}`}>{i.part.status === 'resolved' ? 'Geometrie geladen' : 'Fehlt'}</em>
           </li>
         ))}</ul>
-        {model.instances.length > 400 && <p className="fmt-muted">… und {model.instances.length - 400} weitere</p>}
       </details>
       <p className="fmt-muted">Quelldaten werden unverändert im Projekt aufbewahrt ({Object.keys(model.resources ?? {}).length} Ressourcen).</p>
       <details className="fmt-details">
-        <summary>LDraw-Herkunft und Lizenzen <ChevronDown size={14} /></summary>
+        <summary>Geometrie-/Zuordnungsherkunft und Lizenzen <ChevronDown size={14} /></summary>
         <p className="fmt-muted">Originaldateien unverändert; Auswahl und Paketierung durch BrickBuilder. Lizenz pro Datei: CC BY 4.0 oder CC0. Bei dualer Lizenz wird CC BY 4.0 genutzt.</p>
         <ul>{Object.values(model.resources).map(file => (
           <li key={file.path}><a href={file.sourceUrl} target="_blank" rel="noreferrer">{file.path}</a>
