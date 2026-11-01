@@ -14,10 +14,12 @@ import {
 } from "./model";
 import { commit, createHistory, redo, undo, type HistoryState } from "./history";
 import type { LibraryPart } from "../parts/types";
-import { ensureCatalog, useCatalog } from "../catalog/client";
+import { ensureCatalog, resolveStoredInventory, useCatalog } from "../catalog/client";
 import { refreshedCatalogModel } from "../catalog/refresh-model";
 import { resolveColor } from "../formats/colors";
-import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
+import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, placeInventoryPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
+import type { Inventory, InventoryChoice } from "../inventory/types";
+import { replaceInventory, requireAvailable } from "../inventory/accounting";
 import {
   listProjectSummaries,
   type ProjectSummary,
@@ -48,6 +50,8 @@ export function useBuilder() {
   const [selectedColor, setSelectedColorValue] = useState("#B40000");
   const [selectedColorCode, setSelectedColorCode] = useState<string | undefined>("4");
   const [preparedPart, setPreparedPart] = useState<PreparedPart | null>(null);
+  const [selectedInventory, setSelectedInventory] = useState<InventoryChoice | null>(null);
+  const placementRef = useRef<{ prepared: PreparedPart; inventory?: InventoryChoice } | null>(null);
   const [partLoading, setPartLoading] = useState(false);
   const [partError, setPartError] = useState<string | null>(null);
   const partControllerRef = useRef<AbortController | null>(null);
@@ -85,6 +89,9 @@ export function useBuilder() {
 
   const replaceDocument = useCallback((document: BuilderDocument, alreadySaved = false) => {
     const opened = normalizeDocument(document);
+    partControllerRef.current?.abort();
+    placementRef.current = null;
+    setPreparedPart(null); setSelectedInventory(null); setPartLoading(false); setPartError(null);
     const next = createHistory(opened);
     historyRef.current = next;
     documentRef.current = opened;
@@ -218,6 +225,7 @@ export function useBuilder() {
 
   const selectLibraryPart = useCallback(async (part: LibraryPart) => {
     partControllerRef.current?.abort();
+    placementRef.current = null; setPreparedPart(null); setSelectedInventory(null);
     const controller = new AbortController();
     partControllerRef.current = controller;
     setPartLoading(true); setPartError(null);
@@ -225,6 +233,7 @@ export function useBuilder() {
       const prepared = await prepareLibraryPart(part, controller.signal);
       if (controller.signal.aborted) return false;
       setPreparedPart(prepared);
+      placementRef.current = { prepared };
       setSelectedId(null); setToolMode("build");
       return true;
     } catch (error) {
@@ -232,6 +241,48 @@ export function useBuilder() {
       return false;
     } finally { if (!controller.signal.aborted) setPartLoading(false); }
   }, []);
+  const selectInventoryPart = useCallback(async (choice: InventoryChoice) => {
+    partControllerRef.current?.abort();
+    const controller = new AbortController();
+    partControllerRef.current = controller;
+    placementRef.current = null; setPreparedPart(null); setSelectedInventory(null);
+    setPartLoading(true); setPartError(null);
+    const projectId = documentRef.current.id;
+    try {
+      const row = requireAvailable(documentRef.current, choice);
+      const preview = await resolveStoredInventory(documentRef.current.inventory!);
+      controller.signal.throwIfAborted();
+      const resolution = preview.resolutions[row.id];
+      const candidate = resolution?.parts.find(part => part.ldrawId === choice.ldrawId);
+      if (!candidate || !resolution.colors.some(color => color.ldrawCode === choice.colorCode)) throw new Error(`BrickLink ${row.partId}, Farbe ${row.colorId}: Auswahl nicht belegt. Bitte erneut auswählen.`);
+      const prepared = await prepareLibraryPart({
+        id: `inventory:${choice.listId}:${choice.rowId}`, packageId: "catalog",
+        ldrawId: candidate.ldrawId, brickLinkId: row.partId, name: candidate.name,
+        category: "Teileliste", keywords: [], file: `parts/${candidate.ldrawId}.dat`,
+      }, controller.signal);
+      controller.signal.throwIfAborted();
+      if (documentRef.current.id !== projectId) return false;
+      requireAvailable(documentRef.current, choice);
+      const color = resolveColor(choice.colorCode);
+      if (!color) throw new Error(`BrickLink-Farbe ${row.colorId}: LDraw-Farbe nicht verfügbar.`);
+      placementRef.current = { prepared, inventory: { ...choice } };
+      setPreparedPart(prepared); setSelectedInventory({ ...choice });
+      setSelectedColorValue(color.hex); setSelectedColorCode(choice.colorCode);
+      setSelectedId(null); setToolMode("build");
+      return true;
+    } catch (error) {
+      if (!controller.signal.aborted) setPartError(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally { if (!controller.signal.aborted) setPartLoading(false); }
+  }, []);
+  const replacePartsInventory = useCallback((inventory: Inventory, expectedProjectId: string) => {
+    updateDocument(document => {
+      if (document.id !== expectedProjectId) throw new Error("Projekt wurde inzwischen gewechselt.");
+      return replaceInventory(document, inventory);
+    });
+    partControllerRef.current?.abort();
+    placementRef.current = null; setPreparedPart(null); setSelectedInventory(null); setPartLoading(false);
+  }, [updateDocument]);
   const cancelPartPreparation = useCallback(() => {
     partControllerRef.current?.abort();
     setPartLoading(false);
@@ -240,18 +291,21 @@ export function useBuilder() {
   const place = useCallback(
     (position: Position3) => {
       if (toolMode === "delete" || partLoading) return;
-      if (!preparedPart) { setPartError("Bitte zuerst ein Teil aus der LDraw-Bibliothek auswählen."); return; }
+      const selection = placementRef.current;
+      if (!selection) { setPartError("Bitte zuerst ein Teil aus dem LDraw-Katalog oder der Teileliste auswählen."); return; }
       try {
         let id: string | null = null;
         updateDocument(document => {
-          const next = placePreparedPart(document, preparedPart, position, selectedColor, selectedColorCode);
+          const next = selection.inventory
+            ? placeInventoryPart(document, selection.prepared, position, selection.inventory)
+            : placePreparedPart(document, selection.prepared, position, selectedColor, selectedColorCode);
           id = next.imported!.instances.at(-1)!.id;
           return next;
         });
         setSelectedId(id); setPartError(null);
       } catch (error) { setPartError(error instanceof Error ? error.message : String(error)); }
     },
-    [selectedColor, selectedColorCode, preparedPart, partLoading, toolMode, updateDocument],
+    [selectedColor, selectedColorCode, partLoading, toolMode, updateDocument],
   );
 
   const move = useCallback(
@@ -389,6 +443,7 @@ export function useBuilder() {
     async (id: string) => {
       const project = await loadProject(id);
       if (!project) return false;
+      await saveProject(historyRef.current.document);
       const refreshed = project.imported ? { ...project, imported: refreshedCatalogModel(project.imported) } : project;
       await saveProject(refreshed);
       replaceDocument(refreshed, true);
@@ -455,7 +510,7 @@ export function useBuilder() {
     selectedColorCode,
     selectedPart: preparedPart?.part ?? null,
     selectedInstance: document.imported?.instances.find(instance => instance.id === selectedId) ?? null,
-    selectLibraryPart, cancelPartPreparation, partLoading, partError,
+    selectLibraryPart, selectInventoryPart, replacePartsInventory, selectedInventory, cancelPartPreparation, partLoading, partError,
     toolMode,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,

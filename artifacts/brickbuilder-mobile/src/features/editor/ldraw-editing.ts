@@ -5,6 +5,8 @@ import type { LibraryPart } from "../parts/types";
 import { COLORS, resolveColor } from "../formats/colors";
 import { importLDraw } from "../formats/ldraw/import";
 import { compilePart, worldMatrix } from "../engine/ldraw-geometry";
+import type { InventoryChoice } from "../inventory/types";
+import { requireAvailable } from "../inventory/accounting";
 
 export interface PreparedPart {
   part: LibraryPart;
@@ -66,6 +68,7 @@ export function moveImported(document: BuilderDocument, id: string, position: Po
   });
 }
 export function placePreparedPart(document: BuilderDocument, prepared: PreparedPart, position: Position3, hex: string, code?: string): BuilderDocument {
+  if (![position.x, position.y, position.z].every(Number.isFinite)) throw new Error("Ungültige Platzierungsposition.");
   const original = document.imported;
   const resources = { ...(original?.resources ?? {}) };
   for (const [path, file] of Object.entries(prepared.model.resources)) {
@@ -88,6 +91,18 @@ export function placePreparedPart(document: BuilderDocument, prepared: PreparedP
     imported: { ...(original ?? prepared.model), edited: true, resources, legalDocuments,
       instances: [...(original?.instances ?? []), instance] },
   };
+}
+
+/** Availability and allocation are committed together against the latest document. */
+export function placeInventoryPart(document: BuilderDocument, prepared: PreparedPart, position: Position3, choice: InventoryChoice): BuilderDocument {
+  requireAvailable(document, choice);
+  if (prepared.part.ldrawId !== choice.ldrawId) throw new Error("Teilelisten-Geometrie stimmt nicht mit der Auswahl überein.");
+  const color = resolveColor(choice.colorCode);
+  if (!color) throw new Error(`LDraw-Farbe ${choice.colorCode} nicht verfügbar. Teileliste erneut auswählen.`);
+  const next = placePreparedPart(document, prepared, position, color.hex, choice.colorCode);
+  const instances = next.imported!.instances;
+  return { ...next, imported: { ...next.imported!, instances: instances.map((instance, index) =>
+    index === instances.length - 1 ? { ...instance, allocation: { listId: choice.listId, rowId: choice.rowId } } : instance) } };
 }
 
 /** Geometry acquisition must never replace edits or resurrect deleted instances. */

@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { builderDatabase } from "@/storage/database";
 import manifest from "./manifest.json";
+import type { Inventory, InventoryPreview } from "../inventory/types";
+import { MAX_LIST_BYTES } from "../inventory/types";
 import { getCatalogState, subscribeCatalog, updateCatalogState as update } from "./state";
 export { getCatalogState, installCatalogIndex } from "./state";
 export { default as catalogManifest } from "./manifest.json";
@@ -69,4 +71,14 @@ export function ensureCatalog(): Promise<void> {
 export async function searchFullCatalog(query: string, kind: "parts" | "colors"): Promise<CatalogSearchResult[]> {
   await ensureCatalog();
   return (await request({ type: "search", query, kind })).results;
+}
+export async function previewInventory(file: File): Promise<InventoryPreview> {
+  if (file.size > MAX_LIST_BYTES) throw new Error("Teileliste ist größer als 2 MiB.");
+  await ensureCatalog();
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+  return (await request({ type: "inventory", text, name: file.name })).preview;
+}
+export async function resolveStoredInventory(inventory: Inventory): Promise<InventoryPreview> {
+  await ensureCatalog();
+  return (await request({ type: "inventory", inventory })).preview;
 }

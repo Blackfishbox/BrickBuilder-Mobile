@@ -3,6 +3,7 @@ import Dexie, { type Table } from "dexie";
 import type { BuilderDocument } from "@/features/editor/model";
 import type { InstalledPackage, LibraryPart, StoredLibraryFile } from "@/features/parts/types";
 import type { RetrievalSnapshot } from "@/features/formats/types";
+import { validateInventory } from "@/features/inventory/accounting";
 
 interface AppMetadata {
   key: string;
@@ -54,6 +55,7 @@ class BuilderDatabase extends Dexie {
 export const builderDatabase = new BuilderDatabase();
 
 export async function saveProject(document: BuilderDocument): Promise<void> {
+  validateInventory(document);
   const savedDocument = { ...document, updatedAt: new Date().toISOString() };
   await builderDatabase.transaction("rw", builderDatabase.projects, builderDatabase.metadata, async () => {
     await builderDatabase.projects.put(savedDocument);
@@ -67,6 +69,7 @@ export async function saveProject(document: BuilderDocument): Promise<void> {
 
 /** Single transaction protects both the previous model and active project pointer. */
 export async function createImportedProject(previous: BuilderDocument, imported: BuilderDocument): Promise<void> {
+  validateInventory(previous); validateInventory(imported);
   if (previous.id === imported.id) throw new Error("Import muss ein neues Projekt anlegen.");
   await builderDatabase.transaction("rw", builderDatabase.projects, builderDatabase.metadata, async () => {
     if (await builderDatabase.projects.get(imported.id)) throw new Error("Projekt-ID bereits vorhanden.");

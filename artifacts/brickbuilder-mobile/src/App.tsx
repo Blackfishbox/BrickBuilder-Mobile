@@ -39,6 +39,7 @@ import PartsLibrary from '@/features/parts/PartsLibrary';
 import FormatDialog from '@/features/formats/FormatDialog';
 import ImportPartNotification from '@/features/formats/ImportPartNotification';
 import StorageManager from '@/features/storage/StorageManager';
+import InventoryPanel from '@/features/inventory/InventoryPanel';
 
 const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   type: type as BrickType,
@@ -62,6 +63,9 @@ function App() {
   const [saveMessage, setSaveMessage] = useState('');
   const [formatsOpen, setFormatsOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
+  const [partsTab, setPartsTab] = useState<'ldraw' | 'inventory'>('ldraw');
+  const activeInventoryRow = editor.selectedInventory && editor.document.inventory?.id === editor.selectedInventory.listId
+    ? editor.document.inventory.rows.find(row => row.id === editor.selectedInventory!.rowId) : undefined;
   useEffect(() => {
     if (!partsOpen) editor.cancelPartPreparation();
   }, [partsOpen, editor.cancelPartPreparation]);
@@ -272,6 +276,12 @@ function App() {
                 LDraw: {editor.imported.instances.length} Teile · {importDiagnostics(editor.imported).warnings.length} Importwarnungen
               </button>
             )}
+            {activeInventoryRow && (
+              <div className="inventory-mode-banner" role="status" data-testid="status-inventory-mode">
+                <span>Meine Teileliste: BL {activeInventoryRow.partId} · Farbe {activeInventoryRow.colorId} · LDraw {editor.selectedInventory!.ldrawId}</span>
+                <button type="button" onClick={() => { setPartsTab('inventory'); setPartsOpen(true); }} data-testid="button-inventory-mode-open">Liste</button>
+              </div>
+            )}
             {editor.brickCount === 0 && (
               <div className="canvas-hint" aria-hidden="true">
                 <span className="hint-cross">+</span>
@@ -289,7 +299,7 @@ function App() {
           <div className="canvas-footline">
             <span className="grid-caption"><span className="grid-indicator" /> GRID SNAP ON</span>
             <button type="button" className="parts-open-button" onClick={() => setPartsOpen(true)} data-testid="button-open-parts">
-              <Layers3 size={16} /><span>Steine</span><span className="parts-count">LDraw</span>
+              <Layers3 size={16} /><span>Steine</span><span className="parts-count">{activeInventoryRow ? 'Teileliste' : 'LDraw frei'}</span>
             </button>
           </div>
         </div>
@@ -433,9 +443,30 @@ function App() {
               <div><p className="popover-eyebrow">DEINE STEINE</p><h2 id="parts-title">Steinauswahl</h2></div>
               <button type="button" className="icon-button" onClick={() => setPartsOpen(false)} aria-label="Steinauswahl schließen" data-testid="button-close-parts"><X size={18} /></button>
             </div>
-            <div id="panel-ldraw" aria-label="LDraw-Bibliothek">
-                {editor.partLoading && <p role="status">LDraw-Geometrie wird geladen …</p>}
-                {editor.partError && <p role="alert">{editor.partError}</p>}
+            <div className="inv-tabs" role="tablist" aria-label="Teilequelle" onKeyDown={event => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              const target = event.key === 'Home' ? 'ldraw' : event.key === 'End' ? 'inventory' : partsTab === 'ldraw' ? 'inventory' : 'ldraw';
+              setPartsTab(target);
+              window.document.getElementById(`tab-${target}`)?.focus();
+            }}>
+              <button type="button" role="tab" id="tab-ldraw" tabIndex={partsTab === 'ldraw' ? 0 : -1} aria-controls="panel-ldraw" aria-selected={partsTab === 'ldraw'} onClick={() => setPartsTab('ldraw')} data-testid="tab-ldraw">LDraw-Katalog</button>
+              <button type="button" role="tab" id="tab-inventory" tabIndex={partsTab === 'inventory' ? 0 : -1} aria-controls="panel-inventory" aria-selected={partsTab === 'inventory'} onClick={() => setPartsTab('inventory')} data-testid="tab-inventory">Meine Teileliste</button>
+            </div>
+            {editor.partLoading && <p role="status">LDraw-Geometrie wird geladen …</p>}
+            {editor.partError && <p role="alert">{editor.partError}</p>}
+            {partsTab === 'inventory' ? (
+              <div id="panel-inventory" role="tabpanel" aria-labelledby="tab-inventory">
+                <InventoryPanel
+                  document={editor.document}
+                  selected={editor.selectedInventory}
+                  onSelect={editor.selectInventoryPart}
+                  onReplace={editor.replacePartsInventory}
+                  onSelected={() => setPartsOpen(false)}
+                />
+              </div>
+            ) : (
+            <div id="panel-ldraw" role="tabpanel" aria-labelledby="tab-ldraw" aria-label="LDraw-Bibliothek">
                 <PartsLibrary
                   online={online}
                   selectedPartId={editor.selectedPart?.ldrawId}
@@ -443,6 +474,7 @@ function App() {
                   onSelect={part => { void editor.selectLibraryPart(part).then(success => { if (success) setPartsOpen(false); }); }}
                 />
               </div>
+            )}
             <p className="drawer-footnote"><span className="local-lock" /> Installierte Teilepakete bleiben offline verfügbar</p>
           </section>
         </div>

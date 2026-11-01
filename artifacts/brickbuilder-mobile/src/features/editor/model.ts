@@ -1,5 +1,7 @@
 import type { ImportedModel } from "../formats/types";
 import { refreshedCatalogModel } from "../catalog/refresh-model";
+import type { Inventory } from "../inventory/types";
+import { validateInventory } from "../inventory/accounting";
 
 export type BrickType = "brick-2x4" | "brick-2x2" | "brick-1x2";
 export type ToolMode = "build" | "select" | "delete";
@@ -29,6 +31,7 @@ export interface BuilderDocument {
   bricks: Brick[];
   metadata: Record<string, unknown>;
   imported?: ImportedModel;
+  inventory?: Inventory;
 }
 
 export interface BrickDefinition {
@@ -93,6 +96,7 @@ export function normalizeDocument(
   document: Partial<BuilderDocument> & Pick<BuilderDocument, "id" | "name">,
 ): BuilderDocument {
   const now = new Date().toISOString();
+  validateInventory(document as BuilderDocument);
   if (document.imported) document = { ...document, imported: refreshedCatalogModel(document.imported) };
   return {
     schemaVersion: 1,
@@ -106,5 +110,6 @@ export function normalizeDocument(
         ? document.metadata
         : {},
     ...(document.imported ? { imported: document.imported } : {}),
+    ...(document.inventory ? { inventory: document.inventory } : {}),
   };
 }

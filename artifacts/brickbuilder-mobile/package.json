@@ -83,6 +83,7 @@
   },
   "dependencies": {
     "dexie": "^4.4.7",
+    "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.3",
     "three": "^0.187.0",
     "workbox-window": "^7.4.1"

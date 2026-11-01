@@ -2,6 +2,8 @@ import { z } from "zod";
 import { normalizeDocument, type BuilderDocument } from "@/features/editor/model";
 import { compilePart } from "@/features/engine/ldraw-geometry";
 import { mappingResultSchema } from "@/features/parts/mapping-schema";
+import { inventorySchema, allocationSchema } from "@/features/inventory/types";
+import { validateInventory } from "@/features/inventory/accounting";
 
 const finite = z.number().finite().min(-1e9).max(1e9);
 const legalDocument = z.object({
@@ -20,6 +22,7 @@ const color = z.object({
   studioId: z.string().optional(), source: z.string(),
 }).passthrough();
 const schema = z.object({
+  inventory: inventorySchema.optional(),
   schemaVersion: z.literal(1), id: z.string().min(1), name: z.string().max(256),
   createdAt: z.string(), updatedAt: z.string(), metadata: z.record(z.string(), z.unknown()),
   bricks: z.array(z.object({
@@ -36,6 +39,7 @@ const schema = z.object({
       id: z.string(), reference: z.string().max(240).regex(/^[a-z0-9_ /.-]+\.dat$/i), colorCode: z.string().regex(/^(?:\d+|0x2[0-9a-f]{6})$/i),
       matrix: z.tuple([finite, finite, finite, finite, finite, finite, finite, finite, finite, finite, finite, finite]),
       sourcePath: z.array(z.string()),
+      allocation: allocationSchema.optional(),
       sourceOccurrence: z.array(z.number().int().nonnegative()).max(49).optional(),
       part: z.object({ ldrawId: z.string(), studioId: z.string().optional(), brickLinkId: z.string().optional(), name: z.string().optional(), mapping: mappingResultSchema.optional(), status: z.enum(["resolved", "missing"]) }),
       color: color.optional(),
@@ -56,6 +60,7 @@ const schema = z.object({
 });
 export function importInternal(bytes: Uint8Array): BuilderDocument {
   const parsed = schema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+  validateInventory(parsed as BuilderDocument);
   if (new Set(parsed.bricks.map(b => b.id)).size !== parsed.bricks.length) throw new Error("Doppelte Stein-IDs.");
   if (parsed.imported) {
     if (Object.keys(parsed.imported.resources).length > 4096) throw new Error("Zu viele Geometriedateien.");

@@ -1,4 +1,5 @@
 import type { LibraryFile, PackagePayload, PartMappingResult } from "../parts/types";
+import type { Allocation } from "../inventory/types";
 
 /** Row-major affine 3x4 in original LDraw units, including reflection/shear. */
 export type Affine = [number, number, number, number, number, number, number, number, number, number, number, number];
@@ -15,6 +16,7 @@ export interface ResolvedColor {
   source: string;
 }
 export interface ImportedInstance {
+  allocation?: Allocation;
   id: string;
   reference: string;
   colorCode: string;

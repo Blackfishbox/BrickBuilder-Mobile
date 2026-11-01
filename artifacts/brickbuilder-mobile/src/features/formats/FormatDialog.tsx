@@ -258,6 +258,7 @@ export default function FormatDialog({ document, onClose, onImport, onResolved }
             ))}
           </div>
           {exportError && <div className="fmt-error" role="alert" data-testid="status-export-error">{exportError}</div>}
+          <p className="fmt-muted" data-testid="text-inventory-backup-notice">Teileliste: Nur die interne JSON-Sicherung bewahrt „Meine Teileliste“ samt Mengen und Zuordnungen verbauter Teile. LDR, MPD und IO enthalten keine Teilelisten-Zuordnungen.</p>
         </div>
       </section>
     </div>

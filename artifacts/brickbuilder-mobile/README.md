@@ -157,7 +157,17 @@ Tests cover snapshot hashes, recursive completeness, independent package
 installation, offline search after reopening, cancellation/failure,
 transaction rollback and existing-project migration.
 
-## Development
+## Build from your parts list
+
+The drawer's **Meine Teileliste** tab imports BrickLink inventory/wanted-list
+XML and the documented CSV template with an explicit preview. Quantities limit
+only parts placed from that tab; the **LDraw-Katalog** stays unrestricted.
+List allocations survive editing, undo/redo, local saves and internal JSON
+backups. LDR/MPD/IO do not carry inventory allocations.
+See [build from inventory](docs/build-from-inventory.md) for exact formats,
+limits, mapping rules, safe replacement and offline behavior.
+
+## Development commands
 
 ```sh
 # Replit supplies PORT and BASE_PATH through the managed workflow.

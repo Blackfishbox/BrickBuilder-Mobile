@@ -1,4 +1,6 @@
 import { decodeCatalog, indexCatalog, searchCatalog, type CatalogData } from "./data";
+import { parseInventory } from "../inventory/import";
+import { resolveInventory } from "./inventory-resolution";
 let data: CatalogData | undefined;
 self.onmessage = async (event: MessageEvent) => {
   const { id, type, bytes, sha256, query, kind } = event.data;
@@ -13,7 +15,10 @@ self.onmessage = async (event: MessageEvent) => {
       self.postMessage({ id, index, attribution: data.attribution });
     } else {
       if (!data) throw new Error("Katalog noch nicht geladen.");
-      self.postMessage({ id, results: searchCatalog(data, query, kind) });
+      if (type === "inventory") {
+        const inventory = event.data.inventory ?? parseInventory(event.data.text, event.data.name);
+        self.postMessage({ id, preview: resolveInventory(data, inventory) });
+      } else self.postMessage({ id, results: searchCatalog(data, query, kind) });
     }
   } catch (error) { self.postMessage({ id, error: error instanceof Error ? error.message : String(error) }); }
 };
