@@ -270,7 +270,7 @@ function App() {
               />
             </Suspense>
             {catalog.status === "error" && <div role="status" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm">Vollständiger Zuordnungskatalog nicht verfügbar. Vorhandene Nachweise bleiben erhalten. <button type="button" onClick={() => setPartsOpen(true)}>Katalog unter „Steine“ erneut laden</button></div>}
-            {editor.partError && !partsOpen && <p role="alert" className="absolute left-3 right-3 top-3 z-10 rounded bg-white p-3 text-sm" data-testid="status-part-error">{editor.partError}</p>}
+            {editor.partError && !partsOpen && <p role="alert" className="canvas-part-error" data-testid="status-part-error">{editor.partError}</p>}
             {editor.imported && (
               <button type="button" className="import-report-button" onClick={() => setFormatsOpen(true)} data-testid="button-import-report">
                 LDraw: {editor.imported.instances.length} Teile · {importDiagnostics(editor.imported).warnings.length} Importwarnungen
