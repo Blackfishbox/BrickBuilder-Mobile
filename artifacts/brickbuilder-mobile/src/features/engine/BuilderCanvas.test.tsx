@@ -6,6 +6,7 @@ import { PerspectiveCamera, Vector3 } from "three";
 import { engineFixture } from "./engine-fixtures";
 import type { SoftwareScene } from "./software-scene";
 import * as softwareRendering from "./software-scene";
+import * as cameraGestures from "./camera-gesture";
 import BuilderCanvas from "./BuilderCanvas";
 import * as snapping from "../connections/engine";
 import type { Contact } from "../connections/types";
@@ -14,7 +15,7 @@ import { resolve } from "node:path";
 import { gunzipSync } from "fflate";
 import { parseLDraw } from "../formats/ldraw/parser";
 import type { ImportedModel } from "../formats/types";
-import { createEmptyDocument } from "../editor/model";
+import { createEmptyDocument, type ToolMode } from "../editor/model";
 import { moveImported } from "../editor/ldraw-editing";
 
 const observed = vi.hoisted(() => ({ scene: undefined as SoftwareScene | undefined, preparations: 0 }));
@@ -122,10 +123,10 @@ describe("frame-coalesced drag transactions", () => {
     expect(observed.scene!.positions).toEqual(preview);
     expect(snapping.activeConnections(committed.imported!, id)).toHaveLength(2);
   });
-  async function mount() {
+  async function mount(toolMode: ToolMode = "select") {
     const model = engineFixture(1, 2), onMove = vi.fn(), onSelect = vi.fn();
     const props = { projectId: "one", bricks: [], imported: model, selectedId: model.instances[0].id,
-      selectedType: "brick-2x4" as const, selectedColor: "#B40000", toolMode: "select" as const, onMove, onSelect, onPlace: vi.fn() };
+      selectedType: "brick-2x4" as const, selectedColor: "#B40000", toolMode, onMove, onSelect, onPlace: vi.fn() };
     act(() => { root.render(<BuilderCanvas {...props} />); });
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
     host = element.querySelector("[data-testid='canvas-3d']")!;
@@ -133,6 +134,88 @@ describe("frame-coalesced drag transactions", () => {
     expect(observed.scene).toBeDefined();
     return { model, onMove, props, point: pickPoint() };
   }
+  for (const toolMode of ["build", "select", "delete"] as const) {
+    it(`takes over touches on parts in ${toolMode} without editor transactions`, async () => {
+      const { props, point, model } = await mount(toolMode);
+      const original = observed.scene!.positions.slice();
+      const gesture = vi.spyOn(cameraGestures, "cameraGesture");
+      pointer("pointerdown", point.x, point.y);
+      if (toolMode === "delete") expect(props.onSelect).not.toHaveBeenCalled();
+      const selections = props.onSelect.mock.calls.length;
+      pointer("pointerdown", point.x + 180, point.y, 2);
+      pointer("pointermove", point.x + 40, point.y + 30);
+      pointer("pointermove", point.x + 220, point.y + 30, 2);
+      flushFrame();
+      const next = gesture.mock.results.at(-1)!.value;
+      const start = gesture.mock.calls[0][0].camera;
+      expect(next.theta).toBe(start.theta); expect(next.phi).toBe(start.phi);
+      expect(next.distance).toBeCloseTo(start.distance);
+      expect(next.target).not.toEqual(start.target);
+      pointer("pointerup", point.x + 220, point.y + 30, 2);
+      const count = gesture.mock.calls.length;
+      pointer("pointermove", point.x + 80, point.y + 80);
+      pointer("pointerup", point.x + 80, point.y + 80);
+      pointer("pointerup", point.x + 80, point.y + 80);
+      expect(gesture).toHaveBeenCalledTimes(count);
+      expect(props.onMove).not.toHaveBeenCalled();
+      expect(props.onPlace).not.toHaveBeenCalled();
+      expect(props.onSelect).toHaveBeenCalledTimes(selections);
+      expect(observed.scene!.positions).toEqual(original);
+      expect(model.instances[0].matrix).toEqual(props.imported.instances[0].matrix);
+    });
+  }
+  for (const end of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    it(`rebases after ${end} with a third finger and starts fresh gestures from the current camera`, async () => {
+      const { props } = await mount("build");
+      const gesture = vi.spyOn(cameraGestures, "cameraGesture");
+      pointer("pointerdown", 20, 30);
+      pointer("pointerdown", 220, 30, 2);
+      pointer("pointermove", 40, 50);
+      pointer("pointermove", 240, 50, 2);
+      const before = gesture.mock.results.at(-1)!.value;
+      pointer("pointerdown", 400, 400, 3);
+      const count = gesture.mock.calls.length;
+      pointer("pointermove", 450, 450, 3);
+      expect(gesture).toHaveBeenCalledTimes(count);
+      pointer(end, 40, 50);
+      pointer("pointermove", 240, 50, 2);
+      expect(gesture.mock.results.at(-1)!.value).toEqual(before);
+      pointer("pointerup", 450, 450, 3);
+      pointer("pointermove", 250, 60, 2);
+      pointer("pointerdown", 100, 100, 4);
+      pointer("pointermove", 100, 100, 4);
+      expect(gesture.mock.results.at(-1)!.value).toEqual(before);
+      pointer("pointerup", 100, 100, 4);
+      pointer("pointerup", 250, 60, 2);
+      pointer("pointerdown", 10, 10, 5);
+      pointer("pointerdown", 210, 10, 6);
+      pointer("pointermove", 210, 10, 6);
+      expect(gesture.mock.calls.at(-1)![0].camera).toEqual(before);
+      pointer("pointerup", 210, 10, 6); pointer("pointerup", 10, 10, 5);
+      expect(props.onPlace).not.toHaveBeenCalled();
+      expect(props.onMove).not.toHaveBeenCalled();
+    });
+  }
+  it("clears a queued drag preview before two-finger takeover and still permits a new delete tap", async () => {
+    const { props, point } = await mount();
+    const original = observed.scene!.positions.slice();
+    const preview = vi.spyOn(softwareRendering, "previewSoftware");
+    pointer("pointerdown", point.x, point.y);
+    pointer("pointermove", point.x + 50, point.y + 10);
+    pointer("pointerdown", point.x - 100, point.y, 2);
+    flushFrame();
+    expect(preview).not.toHaveBeenCalled();
+    expect(observed.scene!.positions).toEqual(original);
+    pointer("pointerup", point.x + 50, point.y + 10);
+    pointer("pointerup", point.x - 100, point.y, 2);
+    expect(props.onMove).not.toHaveBeenCalled();
+    act(() => root.render(<BuilderCanvas {...props} toolMode="delete" />));
+    props.onSelect.mockClear();
+    pointer("pointerdown", point.x, point.y);
+    expect(props.onSelect).not.toHaveBeenCalled();
+    pointer("pointerup", point.x, point.y);
+    expect(props.onSelect).toHaveBeenCalledOnce();
+  });
   it("previews at most once per frame without saves, then calls the editor exactly once", async () => {
     const { model, onMove, point, props } = await mount();
     const original = observed.scene!.positions.slice(), before = observed.scene!.transformedTriangles;

@@ -39,6 +39,7 @@ import { ConnectionOverlay } from "../connections/overlay";
 import type { ConnectionTransform } from "../connections/types";
 import { createBuilderLighting } from "./lighting";
 import type { Affine, ImportedModel } from "../formats/types";
+import { cameraGesture, type GestureStart, type PointerPoint } from "./camera-gesture";
 
 import {
   BRICK_DEFINITIONS,
@@ -61,21 +62,6 @@ interface BuilderCanvasProps {
   onPlace: (position: Position3) => void;
   onSelect: (id: string | null) => void;
   onMove: (id: string, position: Position3, transform?: Affine) => void;
-}
-
-interface PointerPoint {
-  x: number;
-  y: number;
-}
-
-interface GestureStart {
-  center: PointerPoint;
-  distance: number;
-  angle: number;
-  theta: number;
-  phi: number;
-  cameraDistance: number;
-  target: Vector3;
 }
 
 interface DragCandidate {
@@ -410,17 +396,6 @@ function getFootprint(brick: Brick) {
   };
 }
 
-function pointerCenter(points: PointerPoint[]): PointerPoint {
-  return {
-    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
-  };
-}
-
-function pointerDistance(first: PointerPoint, second: PointerPoint): number {
-  return Math.hypot(second.x - first.x, second.y - first.y);
-}
-
 function softwareWarning(scene: SoftwareScene): string {
   const samples = scene.triangleCount - scene.free.length;
   return `Kompatibilitätsansicht ohne WebGL: ${samples.toLocaleString("de-DE")} von ${scene.sourceTriangles.toLocaleString("de-DE")} Dreiecken. Während der Bewegung sind Details reduziert; alle Projektdaten bleiben erhalten.`;
@@ -505,6 +480,8 @@ export function BuilderCanvas({
   const pointersRef = useRef(new Map<number, PointerPoint>());
   const pointerLastRef = useRef(new Map<number, PointerPoint>());
   const gestureStartRef = useRef<GestureStart | null>(null);
+  const gesturePairRef = useRef<readonly [number, number] | null>(null);
+  const cameraOnlyRef = useRef(false);
   const dragRef = useRef<DragCandidate | null>(null);
   const clickRef = useRef<{ id: number; start: PointerPoint; moved: boolean } | null>(
     null,
@@ -1064,18 +1041,18 @@ export function BuilderCanvas({
     };
 
     const startGesture = () => {
-      const points = [...pointersRef.current.values()];
-      if (points.length < 2) return;
-      const [first, second] = points;
+      const ids = [...pointersRef.current.keys()];
+      if (ids.length < 2) {
+        gestureStartRef.current = null;
+        gesturePairRef.current = null;
+        return;
+      }
+      gesturePairRef.current = [ids[0], ids[1]];
+      cameraOnlyRef.current = true;
       const cameraState = cameraStateRef.current;
       gestureStartRef.current = {
-        center: pointerCenter(points),
-        distance: pointerDistance(first, second),
-        angle: Math.atan2(second.y - first.y, second.x - first.x),
-        theta: cameraState.theta,
-        phi: cameraState.phi,
-        cameraDistance: cameraState.distance,
-        target: cameraState.target.clone(),
+        points: [pointersRef.current.get(ids[0])!, pointersRef.current.get(ids[1])!],
+        camera: { ...cameraState, target: cameraState.target.clone() },
       };
       rollback();
       clickRef.current = null;
@@ -1089,7 +1066,7 @@ export function BuilderCanvas({
       pointersRef.current.set(event.pointerId, point);
       pointerLastRef.current.set(event.pointerId, point);
       if (pointersRef.current.size > 1) {
-        startGesture();
+        if (!gesturePairRef.current) startGesture();
         return;
       }
 
@@ -1118,8 +1095,6 @@ export function BuilderCanvas({
         } else {
           dragRef.current = null;
         }
-      } else if (current.toolMode === "delete" && hit) {
-        current.onSelect(hit.id);
       }
     };
 
@@ -1130,36 +1105,22 @@ export function BuilderCanvas({
       const currentPoint = { x: event.clientX, y: event.clientY };
       pointerLastRef.current.set(event.pointerId, currentPoint);
       pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      const points = [...pointersRef.current.values()];
-      if (points.length >= 2) {
+      if (pointersRef.current.size >= 2) {
         const start = gestureStartRef.current;
-        if (!start) {
+        const pair = gesturePairRef.current;
+        if (!start || !pair) {
           startGesture();
           return;
         }
-        const [first, second] = points;
-        const center = pointerCenter(points);
-        const angle = Math.atan2(second.y - first.y, second.x - first.x);
-        let angleDelta = angle - start.angle;
-        if (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
-        if (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
-        const distance = pointerDistance(first, second);
-        const zoom = start.distance > 0 ? start.distance / Math.max(1, distance) : 1;
-        const centerX = (center.x - start.center.x) * 0.004;
-        const deltaX = (center.x - start.center.x) * start.cameraDistance * 0.002;
-        const deltaY = (center.y - start.center.y) * start.cameraDistance * 0.002;
-        const target = start.target.clone();
-        target.x -= deltaX * Math.cos(start.theta);
-        target.z += deltaX * Math.sin(start.theta);
-        target.y -= deltaY;
-        updateCamera(
-          start.theta + angleDelta + centerX,
-          start.phi,
-          start.cameraDistance * zoom,
-          target,
-        );
+        if (!pair.includes(event.pointerId)) return;
+        const rect = host.getBoundingClientRect();
+        const next = cameraGesture(start, [pointersRef.current.get(pair[0])!, pointersRef.current.get(pair[1])!],
+          { width: rect.width, height: rect.height, fov: cameraRef.current!.fov });
+        updateCamera(next.theta, next.phi, next.distance, next.target);
         return;
       }
+      // A remaining finger must not resume the part action or orbit after takeover.
+      if (cameraOnlyRef.current) return;
 
       const start = dragRef.current;
       const click = clickRef.current;
@@ -1208,11 +1169,11 @@ export function BuilderCanvas({
     };
 
     const onPointerUp = (event: PointerEvent) => {
-      if (event.target instanceof Element && event.target.closest("button")) return;
+      if (!pointersRef.current.has(event.pointerId)) return;
       const point = { x: event.clientX, y: event.clientY };
       const current = propsRef.current;
       const click = clickRef.current;
-      if (pointersRef.current.size === 1) {
+      if (pointersRef.current.size === 1 && !cameraOnlyRef.current) {
         const drag = dragRef.current;
         if (drag?.pointerId === event.pointerId && drag.moved) {
           resolveDrag(drag);
@@ -1235,6 +1196,9 @@ export function BuilderCanvas({
             destination = projectToPlane(point, 0);
           }
           if (destination) current.onPlace({ ...destination, y: destination.y - importedOffsetRef.current });
+        } else if (current.toolMode === "delete" && click && !click.moved) {
+          const hit = findBrick(point);
+          if (hit) current.onSelect(hit.id);
         } else if (current.toolMode === "select" && !drag && click && !click.moved) {
           const hit = findBrick(point);
           current.onSelect(hit?.id ?? null);
@@ -1244,7 +1208,8 @@ export function BuilderCanvas({
       pointersRef.current.delete(event.pointerId);
       pointerLastRef.current.delete(event.pointerId);
       clickRef.current = null;
-      if (pointersRef.current.size < 2) gestureStartRef.current = null;
+      if (gesturePairRef.current?.includes(event.pointerId)) startGesture();
+      if (pointersRef.current.size === 0) cameraOnlyRef.current = false;
       if (pointersRef.current.size === 0) dragRef.current = null;
       if (host.hasPointerCapture(event.pointerId)) {
         host.releasePointerCapture(event.pointerId);
@@ -1258,7 +1223,8 @@ export function BuilderCanvas({
       pointersRef.current.delete(event.pointerId);
       pointerLastRef.current.delete(event.pointerId);
       rollback();
-      gestureStartRef.current = null;
+      if (gesturePairRef.current?.includes(event.pointerId)) startGesture();
+      if (pointersRef.current.size === 0) cameraOnlyRef.current = false;
       clickRef.current = null;
     };
 
@@ -1267,7 +1233,10 @@ export function BuilderCanvas({
     host.addEventListener("pointerup", onPointerUp, { passive: false });
     host.addEventListener("pointercancel", onPointerCancel, { passive: false });
     host.addEventListener("lostpointercapture", onPointerCancel);
-    const onBlur = () => { rollback(); pointersRef.current.clear(); pointerLastRef.current.clear(); };
+    const onBlur = () => {
+      rollback(); pointersRef.current.clear(); pointerLastRef.current.clear();
+      gestureStartRef.current = null; gesturePairRef.current = null; cameraOnlyRef.current = false;
+    };
     window.addEventListener("blur", onBlur);
     return () => {
       host.removeEventListener("pointerdown", onPointerDown);
