@@ -39,7 +39,7 @@ export function cameraGesture(
     theta: theta + twist,
     phi,
     distance: initialSpan >= 12 ? distance * initialSpan / Math.max(12, span) : distance,
-    // Keep the user's inverted vertical direction, without changing one-finger orbit.
-    target: target.clone().addScaledVector(right, -dx).addScaledVector(up, -dy),
+    // Reverse both pan axes as requested, without changing pinch, twist or orbit.
+    target: target.clone().addScaledVector(right, dx).addScaledVector(up, dy),
   };
 }

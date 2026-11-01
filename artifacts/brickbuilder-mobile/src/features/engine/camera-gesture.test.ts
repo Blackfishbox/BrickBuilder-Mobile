@@ -15,7 +15,7 @@ describe("independent two-finger camera gestures", () => {
     for (const theta of [0, 0.72, Math.PI / 2, -2.4]) {
       for (const phi of [0.25, 0.93, 1.42]) {
         for (const distance of [3, 17, 800]) {
-          it(`pans in the inverted camera plane at ${width}x${height}, ${theta}/${phi}/${distance}`, () => {
+          it(`reverses both pan axes at ${width}x${height}, ${theta}/${phi}/${distance}`, () => {
             const start = baseline(theta, phi, distance);
             const camera = new PerspectiveCamera(42, width / height, 0.1, 4000);
             camera.position.copy(start.camera.target).add(new Vector3(
@@ -23,14 +23,15 @@ describe("independent two-finger camera gestures", () => {
               distance * Math.sin(phi) * Math.cos(theta)));
             camera.lookAt(start.camera.target); camera.updateMatrixWorld(true);
             const origin = start.camera.target.clone().project(camera);
-            for (const [dx, dy] of [[30, 0], [0, 40], [30, 40]]) {
+            for (const [dx, dy] of [[30, 0], [-30, 0], [0, 40], [0, -40], [30, 40], [-30, -40]]) {
               const next = cameraGesture(start, shift(dx, dy), { width, height, fov: 42 });
               expect(next.theta).toBe(theta); expect(next.phi).toBe(phi); expect(next.distance).toBe(distance);
               const projected = next.target.clone().project(camera).sub(origin);
-              expect(projected.x * width / 2).toBeCloseTo(-dx);
-              expect(projected.y * height / 2).toBeCloseTo(-dy);
+              expect(projected.x * width / 2).toBeCloseTo(dx);
+              expect(projected.y * height / 2).toBeCloseTo(dy);
               expect(projected.z).toBeCloseTo(0);
-              if (dy) expect(next.target.y).toBeLessThan(start.camera.target.y);
+              if (dy > 0) expect(next.target.y).toBeGreaterThan(start.camera.target.y);
+              if (dy < 0) expect(next.target.y).toBeLessThan(start.camera.target.y);
             }
             expect(start.camera.target.toArray()).toEqual([1, 2, 3]);
           });
