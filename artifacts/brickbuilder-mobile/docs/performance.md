@@ -30,10 +30,15 @@ geometry fixtures; the compatibility snapping API delegates to the new engine.
 
 ### Interaction and validation
 
-- Drag close to a compatible stud (capture radius 0.36 studs). The selected
+- Drag close to a compatible stud (capture radius 0.75 studs). The selected
   underside socket and target stud centers align in X/Z, with the underside at
   the target's actual body plane rather than at the stud tip. Bricks therefore
   stack at 24 LDU and plates at 8 LDU, without a 4 LDU stud-envelope gap.
+- A per-gesture magnetic latch retains the exact connection while the pointer
+  stays within 0.95 studs in X/Z of the snapped origin. Continuing beyond that
+  distance releases it and searches again, allowing movement to the next stud.
+  Vertical release uses the raw drag height, not the automatically raised
+  height. Cancellation and model changes discard the latch.
 - Full connector frames support tilted and sideways matching. Scale, reflection
   and profile roll constraints follow the source policy; unsupported transforms
   produce diagnostics and conservative fallback rather than guessed connectors.

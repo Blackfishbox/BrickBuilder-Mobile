@@ -99,7 +99,7 @@ describe("frame-coalesced drag transactions", () => {
   });
   it("coalesces connection searches and commits the exact off-grid live preview", async () => {
     const { onMove, point } = await mount();
-    const snap = vi.spyOn(snapping, "constructionTransform").mockReturnValue({ matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" });
+    const snap = vi.spyOn(snapping, "magneticConstructionTransform").mockReturnValue({ transform: { matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" } });
     pointer("pointerdown", point.x, point.y);
     for (let n = 1; n <= 20; n++) pointer("pointermove", point.x + n * 4, point.y + 10);
     expect(snap).not.toHaveBeenCalled();
@@ -111,11 +111,11 @@ describe("frame-coalesced drag transactions", () => {
     expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.23);
     expect(onMove.mock.calls[0][1].y).toBeCloseTo(2.4);
     expect(onMove.mock.calls[0][1].z).toBeCloseTo(0.17);
-    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.matrix);
+    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.transform.matrix);
   });
   it("resolves a pending connection on release even before the next frame", async () => {
     const { onMove, point } = await mount();
-    const snap = vi.spyOn(snapping, "constructionTransform").mockReturnValue({ matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" });
+    const snap = vi.spyOn(snapping, "magneticConstructionTransform").mockReturnValue({ transform: { matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [], status: "candidate" } });
     pointer("pointerdown", point.x, point.y);
     pointer("pointermove", point.x + 80, point.y + 10);
     pointer("pointerup", point.x + 80, point.y + 10);
@@ -123,19 +123,40 @@ describe("frame-coalesced drag transactions", () => {
     expect(onMove.mock.calls[0][1].x).toBeCloseTo(0.23);
     expect(onMove.mock.calls[0][1].y).toBeCloseTo(2.4);
     expect(onMove.mock.calls[0][1].z).toBeCloseTo(0.17);
-    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.matrix);
+    expect(onMove.mock.calls[0][2]).toEqual(snap.mock.results[0].value.transform.matrix);
+  });
+  it("carries the magnetic latch across live frames without committing until release", async () => {
+    const { model, onMove, point } = await mount();
+    const transform: snapping.MagneticLatch["transform"] = {
+      matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [contact], status: "candidate",
+    };
+    const latch: snapping.MagneticLatch = { model, id: model.instances[0].id, anchor: { x: 0.23, y: 0, z: 0.17 }, transform };
+    const snap = vi.spyOn(snapping, "magneticConstructionTransform").mockReturnValue({ transform, latch });
+    pointer("pointerdown", point.x, point.y);
+    pointer("pointermove", point.x + 40, point.y + 10);
+    flushFrame();
+    expect(snap.mock.calls[0][3]).toBeUndefined();
+    const preview = observed.scene!.positions.slice();
+    pointer("pointermove", point.x + 45, point.y + 10);
+    flushFrame();
+    expect(snap.mock.calls[1][3]).toBe(latch);
+    expect(observed.scene!.positions).toEqual(preview);
+    expect(onMove).not.toHaveBeenCalled();
+    pointer("pointerup", point.x + 45, point.y + 10);
+    expect(onMove).toHaveBeenCalledOnce();
+    expect(onMove.mock.calls[0][2]).toEqual(transform.matrix);
   });
   for (const cancellation of ["pointercancel", "lostpointercapture", "multitouch", "project", "blur"]) {
     it(`rolls back ${cancellation} without changing the document`, async () => {
       const { onMove, point, props } = await mount(), original = observed.scene!.positions.slice();
-      vi.spyOn(snapping, "constructionTransform").mockReturnValue({
+      vi.spyOn(snapping, "magneticConstructionTransform").mockReturnValue({ transform: {
         matrix: [1, 0, 0, 4.6, 0, 1, 0, -48, 0, 0, 1, 3.4], contacts: [contact], status: "candidate",
-      });
+      } });
       pointer("pointerdown", point.x, point.y);
       pointer("pointermove", point.x + 80, point.y + 10);
       flushFrame();
       expect(observed.scene!.positions).not.toEqual(original);
-      expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("Verbindungskandidat");
+      expect(element.querySelector("[data-testid='connection-status']")?.textContent).toContain("Magnetisch eingerastet");
       if (cancellation === "multitouch") pointer("pointerdown", point.x - 50, point.y, 2);
       else if (cancellation === "project") await act(async () => { root.render(<BuilderCanvas {...props} projectId="two" imported={undefined} />); });
       else if (cancellation === "blur") act(() => window.dispatchEvent(new Event("blur")));

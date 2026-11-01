@@ -3,10 +3,10 @@
  */
 import type { ImportedModel } from "../formats/types";
 import type { Position3 } from "../editor/model";
-import { constructionTransform, snapConnection } from "../connections/engine";
+import { constructionTransform, MAGNET_CAPTURE_STUDS, snapConnection } from "../connections/engine";
 import type { Contact } from "../connections/types";
 
-export const STUD_SNAP_RADIUS = 0.36;
+export const STUD_SNAP_RADIUS = MAGNET_CAPTURE_STUDS;
 export interface ConnectionSnap {
   position: Position3;
   supportId: string;

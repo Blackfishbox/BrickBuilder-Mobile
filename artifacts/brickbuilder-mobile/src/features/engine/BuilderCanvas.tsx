@@ -33,7 +33,8 @@ import { reuseGeometryCache } from "./ldraw-geometry";
 import { importedSelectionBounds, pickSoftwareInstance } from "./imported-selection";
 import { createSoftwareScene, updateSoftwareScene, previewSoftware, restoreSoftware, INTERACTIVE_TRIANGLE_BUDGET, type SoftwareScene } from "./software-scene";
 import { InstanceIndex, instanceIndex } from "./instance-index";
-import { activeConnections, constructionTransform, hasUsableConnections } from "../connections/engine";
+import { activeConnections, magneticConstructionTransform, hasUsableConnections } from "../connections/engine";
+import type { MagneticLatch } from "../connections/engine";
 import { ConnectionOverlay } from "../connections/overlay";
 import type { ConnectionTransform } from "../connections/types";
 import { createBuilderLighting } from "./lighting";
@@ -87,6 +88,7 @@ interface DragCandidate {
   needsSnap?: boolean;
   matrix?: Affine;
   connection?: ConnectionTransform;
+  magneticLatch?: MagneticLatch;
   planeStart: Position3 | null;
 }
 
@@ -1020,10 +1022,13 @@ export function BuilderCanvas({
       if (!drag.destination || !drag.needsSnap) return;
       if (drag.matrix && propsRef.current.imported) {
         const offset = importedOffsetRef.current;
-        const result = constructionTransform(propsRef.current.imported, drag.id, { ...drag.destination, y: drag.destination.y - offset });
+        const magnetic = magneticConstructionTransform(propsRef.current.imported, drag.id,
+          { ...drag.destination, y: drag.destination.y - offset }, drag.magneticLatch);
+        drag.magneticLatch = magnetic.latch;
+        const result = magnetic.transform;
         drag.connection = result;
         if (overlayRef.current) overlayRef.current.contacts = result.contacts;
-        setConnectionStatus(result.status === "candidate" ? `${result.contacts.length} Verbindungskandidat${result.contacts.length === 1 ? "" : "en"} · beim Loslassen übernehmen` :
+        setConnectionStatus(result.status === "candidate" ? `Magnetisch eingerastet · ${result.contacts.length} Verbindung${result.contacts.length === 1 ? "" : "en"} · zum Lösen weiterziehen` :
           result.status === "no-data" ? "Keine nutzbaren Verbindungsdaten · freie Platzierung" : "Keine passende Verbindung · freie Platzierung");
         const position = { x: result.matrix[3] / 20, y: -result.matrix[7] / 20, z: result.matrix[11] / 20 };
         drag.destination = { ...position, y: position.y + offset };

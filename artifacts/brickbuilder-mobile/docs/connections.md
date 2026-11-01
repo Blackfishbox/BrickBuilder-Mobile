@@ -154,6 +154,15 @@ frame, and commits one inventory-aware document transaction on release.
 Original source bytes, hierarchy, legal metadata, allocation and instance ID
 are unchanged. History, autosave and internal JSON store the complete matrix.
 Explicit height controls bypass connection/stacking resolution.
+Magnetic capture covers 15 LDU (0.75 studs), including diagonal midpoints
+between studs. During dragging, a per-gesture latch holds the exact validated
+transform until the raw pointer moves more than 19 LDU (0.95 studs) from its
+snapped X/Z origin or changes height by that distance from the acquisition
+plane. This hysteresis prevents jitter between adjacent sockets. The next
+search may acquire another connection; otherwise grid/stacking fallback
+resumes. The latch is never persisted and cannot survive a model change.
+Collision lifting searches the complete raised connector envelope, not just
+the moving part's origin, so wide and tall parts retain nearby candidates.
 Imported models retain their existing display-floor offset when an oriented
 snap changes a part's vertical bounds; rotation is not constrained to the
 moving part's old upright lower face.

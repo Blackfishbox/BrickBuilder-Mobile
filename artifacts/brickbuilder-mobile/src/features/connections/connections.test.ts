@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { describeConnections, transformConnector, matrix4 } from "./description";
 import { potentialPair, profileOverlap } from "./profiles";
-import { activeConnections, constructionTransform, snapConnection } from "./engine";
+import { activeConnections, constructionTransform, magneticConstructionTransform, snapConnection } from "./engine";
 import { connectionFixture, partLine } from "./fixtures";
 import { IDENTITY } from "../formats/ldraw/parser";
 import { createEmptyDocument } from "../editor/model";
@@ -82,6 +82,42 @@ describe("genuine source profile families", () => {
 });
 
 describe("oriented connection transactions", () => {
+  it("captures studs across the diagonal midpoint rather than leaving grid dead zones", () => {
+    const model = connectionFixture([partLine("3001", 0, -24), partLine("3003", 160, -24)].join("\n"));
+    const snap = snapConnection(model, model.instances[1].id, { x: 0.49, y: 1.2, z: 0.49 });
+    expect(snap?.contacts.length).toBeGreaterThan(0);
+    expect(snap!.matrix[7]).toBe(-48);
+    expect(snap!.matrix[3] % 20).toBeCloseTo(0);
+    expect(snap!.matrix[11] % 20).toBeCloseTo(0);
+  });
+  it("holds an acquired stud through pointer jitter, then releases and catches the next stud", () => {
+    const model = connectionFixture([partLine("3001", 4.6, -24, 3.4), partLine("3003", 160, -24)].join("\n"));
+    const id = model.instances[1].id;
+    const first = magneticConstructionTransform(model, id, { x: 0.28, y: 1.2, z: 0.2 });
+    expect(first.latch).toBeDefined();
+    // The raw drag plane stays at 1.2 while the magnet lifts the brick to 2.4.
+    for (const x of [0.7, 0.82, 0.73, 1.05]) {
+      const held = magneticConstructionTransform(model, id, { x, y: 1.2, z: 0.2 }, first.latch);
+      expect(held.transform).toBe(first.transform);
+      expect(held.latch).toBe(first.latch);
+    }
+    const next = magneticConstructionTransform(model, id, { x: 1.25, y: 1.2, z: 0.2 }, first.latch);
+    expect(next.transform.matrix[3]).toBeCloseTo(24.6);
+    expect(next.transform.matrix[7]).toBe(-48);
+    expect(next.latch).not.toBe(first.latch);
+    const free = magneticConstructionTransform(model, id, { x: 15, y: 1.2, z: 0.2 }, next.latch);
+    expect(free.latch).toBeUndefined();
+    expect(free.transform.contacts).toHaveLength(0);
+  });
+  it("drops a magnetic latch on model changes and explicit vertical movement", () => {
+    const model = connectionFixture([partLine("3001", 0, -24), partLine("3003", 160, -24)].join("\n"));
+    const id = model.instances[1].id, desired = { x: 0.03, y: 1.2, z: 0.02 };
+    const first = magneticConstructionTransform(model, id, desired);
+    expect(first.latch).toBeDefined();
+    const changed = { ...model, instances: [model.instances[1]] };
+    expect(magneticConstructionTransform(changed, id, desired, first.latch).latch).toBeUndefined();
+    expect(magneticConstructionTransform(model, id, { ...desired, y: 12 }, first.latch).latch).toBeUndefined();
+  });
   it("snaps ordinary off-grid studs and persists the complete exact matrix", () => {
     const model = connectionFixture([partLine("3001", 4.6, -24, 3.4), partLine("3003", 160, -24)].join("\n"));
     const id = model.instances[1].id;

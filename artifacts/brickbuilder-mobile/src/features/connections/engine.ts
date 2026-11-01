@@ -8,7 +8,11 @@ import { axes, intervals, potentialPair, profileOverlap } from "./profiles";
 import type { Connector, Contact, ConnectionTransform } from "./types";
 import { matingVolume, surfacesObstruct } from "./obstruction";
 
-const CELL = 80, REACH = 7.2, EPS = 1e-4, MAX_CONTACTS = 64;
+/** A stud pitch is 20 LDU. Cover the diagonal halfway point between studs,
+ * rather than leaving dead zones around each grid intersection. */
+export const MAGNET_CAPTURE_STUDS = 0.75;
+export const MAGNET_RELEASE_STUDS = 0.95;
+const CELL = 80, REACH = MAGNET_CAPTURE_STUDS * 20, EPS = 1e-4, MAX_CONTACTS = 64;
 interface Entry { id: string; instance: ImportedInstance; connectors: Connector[]; box: Box3 }
 interface Index { entries: Map<string, Entry>; cells: Map<string, Set<Entry>>; wide: Entry[] }
 const indexes = new WeakMap<ImportedModel, Index>();
@@ -230,7 +234,8 @@ export function snapConnection(model: ImportedModel, id: string, desired: Positi
   // Preserve collision-driven lifting for ordinary top-down dragging. Search
   // the raised destination as well, but never an unrelated overhead assembly.
   const raised = localStackedPosition(model, id, desired);
-  query.expandByPoint(new Vector3(desired.x * 20, -raised.y * 20, desired.z * 20));
+  query.union(original.box.clone().translate(shift)
+    .translate(new Vector3(0, -(raised.y - desired.y) * 20, 0)).expandByScalar(REACH));
   const near = neighbours(index, query, id);
   let best: ConnectionTransform | null = null, score = Infinity;
   const tried = new Set<string>();
@@ -303,4 +308,27 @@ export function constructionTransform(model: ImportedModel, id: string, desired:
   const matrix = [...instance.matrix] as Affine;
   matrix[3] = position.x * 20; matrix[7] = -position.y * 20; matrix[11] = position.z * 20;
   return { matrix, contacts: [], status: hasUsableConnections(model, id) ? "unconnected" : "no-data" };
+}
+
+/** Per-gesture latch: immutable model identity invalidates it automatically.
+ * The raw pointer anchor, not an automatically lifted height, controls release.
+ * No document state is mutated until the editor commits the final transform. */
+export interface MagneticLatch {
+  model: ImportedModel;
+  id: string;
+  anchor: Position3;
+  transform: ConnectionTransform;
+}
+export function magneticConstructionTransform(
+  model: ImportedModel, id: string, desired: Position3, latch?: MagneticLatch,
+): { transform: ConnectionTransform; latch?: MagneticLatch } {
+  if (latch?.model === model && latch.id === id) {
+    const matrix = latch.transform.matrix;
+    const distance = Math.hypot(desired.x - matrix[3] / 20, desired.z - matrix[11] / 20);
+    if (distance <= MAGNET_RELEASE_STUDS && Math.abs(desired.y - latch.anchor.y) <= MAGNET_RELEASE_STUDS) {
+      return { transform: latch.transform, latch };
+    }
+  }
+  const transform = constructionTransform(model, id, desired);
+  return { transform, latch: transform.contacts.length ? { model, id, anchor: { ...desired }, transform } : undefined };
 }
