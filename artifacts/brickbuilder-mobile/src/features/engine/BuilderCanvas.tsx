@@ -5,11 +5,9 @@ import {
   BufferGeometry,
   Color,
   CylinderGeometry,
-  DirectionalLight,
   EdgesGeometry,
   GridHelper,
   Group,
-  HemisphereLight,
   InstancedMesh,
   LineBasicMaterial,
   LineSegments,
@@ -29,6 +27,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { compilePart, createImportedGroup, worldMatrix } from "./ldraw-geometry";
+import { createBuilderLighting } from "./lighting";
 import { resolveColor } from "../formats/colors";
 import type { ImportedModel } from "../formats/types";
 
@@ -504,18 +503,7 @@ export function BuilderCanvas({
     renderer.domElement.style.userSelect = "none";
     host.appendChild(renderer.domElement);
 
-    const hemi = new HemisphereLight(0xffffff, 0x738177, 2.15);
-    scene.add(hemi);
-    const sun = new DirectionalLight(0xfff4dc, 3.1);
-    sun.position.set(-8, 18, 11);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -22;
-    sun.shadow.camera.right = 22;
-    sun.shadow.camera.top = 22;
-    sun.shadow.camera.bottom = -22;
-    sun.shadow.bias = -0.0004;
-    scene.add(sun);
+    scene.add(createBuilderLighting());
 
     const board = new Mesh(
       new BoxGeometry(34, 0.14, 34),

@@ -4,6 +4,7 @@ import type { LibraryFile, PackagePayload } from "../parts/types";
 import type { ImportedModel } from "./types";
 import manifest from "./geometry-manifest.json";
 import { resolveColor } from "./colors";
+import { refreshModelColors } from "./model-colors";
 import { compilePart, invalidateGeometry } from "../engine/ldraw-geometry";
 import { MAPPING_LEGAL_DOCUMENT, resolvePartMapping } from "../parts/bricklink-evidence";
 import { candidates, dependencies, inspectFile, normalizeReference } from "@workspace/ldraw-source";
@@ -160,13 +161,7 @@ export async function resolveGeometry(model: ImportedModel, options: ResolveOpti
     ...packages.flatMap(p => p.legalDocuments), ...(snapshot?.legalDocuments ?? []), ...onlineLegal, MAPPING_LEGAL_DOCUMENT]
     .filter((doc, index, all) => all.findIndex(d =>
       d.name === doc.name && d.sourceUrl === doc.sourceUrl && d.content === doc.content) === index);
-  for (const code of new Set(model.instances.map(i => i.colorCode))) {
-    const color = resolveColor(code);
-    const matching = model.instances.filter(i => i.colorCode === code);
-    for (const instance of matching) instance.color = color;
-    if (!color) model.issues.push({ code: "missing-color", reference: code, count: matching.length, message: `LDraw-Farbe ${code} nicht zugeordnet. Als magentafarbene Warngeometrie dargestellt, Quellfarbcode bleibt erhalten.` });
-    else if (color.brickLinkId === undefined) model.issues.push({ code: "missing-bl-color", reference: code, message: `Für ${color.name} (LDraw ${code}) ist keine bestätigte BrickLink-Farbnummer hinterlegt.` });
-  }
+  refreshModelColors(model);
   const unmapped = new Set(model.instances.filter(i => !i.part.brickLinkId).map(i => i.reference)).size;
   if (unmapped) model.issues.push({ code: "missing-bl-part", count: unmapped, message: `${unmapped} verschiedene Teile ohne bestätigte BrickLink-Teilenummer. LDraw-Nummern werden nicht als BrickLink-Nummern ausgegeben.` });
   if (Object.values(model.resources).some(f => /!TEXMAP/.test(f.content))) model.issues.push({ code: "textures", message: "LDraw-TEXMAP-Texturen werden nicht dargestellt; Basisflächen bleiben sichtbar." });

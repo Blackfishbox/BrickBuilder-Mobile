@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BRICK_HEIGHT,
   createEmptyDocument,
+  normalizeDocument,
   rotateQuarterTurn,
   snapPosition,
   type Brick,
@@ -60,9 +61,10 @@ export function useBuilder() {
   }, [history]);
 
   const replaceDocument = useCallback((document: BuilderDocument) => {
-    const next = createHistory(document);
+    const opened = normalizeDocument(document);
+    const next = createHistory(opened);
     historyRef.current = next;
-    documentRef.current = document;
+    documentRef.current = opened;
     setHistory(next);
   }, []);
 

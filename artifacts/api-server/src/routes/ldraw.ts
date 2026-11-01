@@ -1,9 +1,20 @@
 import { Router } from "express";
 import { LDrawProvider, ProviderError } from "../lib/ldraw-provider";
 import { normalizePath } from "@workspace/ldraw-source";
+import { restoreArchive } from "../lib/ldraw-archive";
+import { approvedSnapshot } from "../lib/ldraw-snapshot";
+import { ldrawStorage } from "../lib/ldraw-storage";
+import { logger } from "../lib/logger";
 
 const router = Router();
-const provider = new LDrawProvider(fetch, process.env.LDRAW_APPROVED_DIR);
+// Restore before listening so no import can accidentally use the throttled live source.
+const archivePath = process.env.LDRAW_APPROVED_DIR || await restoreArchive(
+  approvedSnapshot,
+  () => ldrawStorage.bucket(approvedSnapshot.bucket).file(approvedSnapshot.object).createReadStream(),
+);
+logger.info({ snapshot: approvedSnapshot.archiveSha256, localOverride: !!process.env.LDRAW_APPROVED_DIR },
+  "LDraw archive resolver ready; no live upstream requests");
+const provider = new LDrawProvider(fetch, archivePath);
 router.get("/ldraw/file", async (req, res) => {
   // No cross-origin browser access, even when the general API enables CORS.
   res.removeHeader("Access-Control-Allow-Origin");

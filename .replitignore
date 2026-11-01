@@ -4,6 +4,7 @@
 # No need to store the pnpm store twice.
 .local
 /generated-artifacts/
+**/generated-artifacts/
 
 # Private uploads and internal agent context are not deployment inputs.
 /attached_assets/

@@ -1,4 +1,5 @@
 import type { ImportedModel } from "../formats/types";
+import { refreshModelColors } from "../formats/model-colors";
 
 export type BrickType = "brick-2x4" | "brick-2x2" | "brick-1x2";
 export type ToolMode = "build" | "select" | "delete";
@@ -92,6 +93,7 @@ export function normalizeDocument(
   document: Partial<BuilderDocument> & Pick<BuilderDocument, "id" | "name">,
 ): BuilderDocument {
   const now = new Date().toISOString();
+  if (document.imported) refreshModelColors(document.imported);
   return {
     schemaVersion: 1,
     id: document.id,

@@ -112,3 +112,32 @@ to resolve new missing files.
 
 Physical Android/GPU acceptance and a full installed-PWA airplane-mode test
 are not established by these standalone checks.
+
+## Persistent resolver source verification
+
+The API defaults to the explicitly pinned official archive in App Storage,
+not the bounded live-file source. The archive identity remains the SHA-256
+documented above. Its compressed transport bundle has SHA-256:
+
+```text
+5cd6248dcad355758dae965eecd3c54af2ca6726b6dbd3d7c9f3580663fedd0b
+```
+
+A clean API startup restored the bundle from App Storage without a local
+archive override. The API reported archive mode ready. Through the HTTPS
+development preview, **130 distinct licensed part requests** then returned
+HTTP 200: 1,228,012 bytes in total, with every response identical to the
+approved raw file, matching `X-LDraw-SHA256` and the pinned archive
+`X-LDraw-Snapshot`. This exceeds the live provider's 120-request hourly budget
+without contacting the live source. A deliberately absent reference returned
+HTTP 404 with an archive-specific message, not a live fallback.
+
+Eight API tests passed, including atomic restoration, restart reuse without
+downloading, interrupted-download recovery, rejection of corrupt/incomplete/
+duplicate/traversing/wrong-identity bundles, and per-request rejection of
+subsequently changed local bytes. API type checking and production bundling
+also passed.
+
+These checks establish the archive-backed development route and restore path;
+they do not establish production deployment, physical Android performance,
+installed-PWA offline acceptance, or broader Studio compatibility.

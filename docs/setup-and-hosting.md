@@ -249,7 +249,39 @@ Do not set cross-origin access headers on this route.
 
 ### Bounded live mode and explicit archive approval
 
-Without `LDRAW_APPROVED_DIR`, the resolver reads only fixed official LDraw URLs
+The repository's API now defaults to a pinned approved archive in App Storage.
+At first startup on a new instance it downloads that immutable compressed
+snapshot from App Storage, verifies its pinned SHA-256, restores it atomically
+and checks every restored file against the archive manifest before serving.
+Subsequent starts reuse the completed local copy. No startup/build action
+downloads a new version from LDraw. The storage object is private and accessed
+using Replit-managed service credentials; it contains only official library
+files and legal texts, never private models. Do not delete it while this
+snapshot remains configured.
+
+`LDRAW_APPROVED_DIR` still overrides the default for a deliberately prepared
+local archive, including standalone hosting outside Replit. A missing or corrupt
+configured archive/storage object fails explicitly; it never silently falls back
+to thousands of live requests. A cold restore needs roughly 500 MiB expanded
+disk space plus its compressed download and can delay API startup. Startup
+failures are reported in the API logs. Restored files remain excluded from Git
+and deployment inputs; durable bytes are in App Storage, not the workspace.
+
+For conscious snapshot maintenance on Replit, run the archive approval below,
+then upload the approved bytes once:
+
+```sh
+node --experimental-strip-types \
+  artifacts/api-server/scripts/publish-ldraw-snapshot.mjs \
+  generated-artifacts/ldraw-approved YOUR_STORAGE_BUCKET
+```
+
+The command prints the storage identity and both hashes. Update the checked-in
+snapshot descriptor deliberately, test a clean restore, and retain the old object
+until no active release needs it. Uploads refuse to overwrite an existing object.
+No private-model upload endpoint or account system is involved.
+
+The underlying provider's optional live mode reads only fixed official LDraw URLs
 and the CC0 legal-code URL. It rejects URLs, traversal, arbitrary namespaces,
 redirects, unsupported license headers and malformed geometry. Limits: four
 upstream requests at once, 12-second upstream timeout, 2 MiB per file, 32 MiB

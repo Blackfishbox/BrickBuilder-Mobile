@@ -64,6 +64,11 @@ compatibility.
 LDraw and BrickLink color IDs/names are separate. Studio IDs and unconfirmed
 BrickLink part IDs are not guessed. Missing geometry is reported by reference
 and count; unknown colors use warning magenta. No silent substitute bricks.
+The offline import palette covers 320 standard LDraw appearances, independently
+of the eight confirmed BrickLink color mappings. Older local projects refresh
+derived color metadata on opening; source codes and original files remain
+unchanged. See [import colors and attribution](docs/import-colors.md) for the
+reviewed source, regression coverage and unsupported Studio-specific codes.
 
 Original upload bytes, submodel source, additional IO archive data, LDraw files,
 credits and license texts remain in the local project. After successful
