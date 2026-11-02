@@ -1,5 +1,9 @@
 # Setup and hosting
 
+Before exposing the optional API, read the
+[dependency security review](security-dependency-review.md) for the fixed
+versions, remaining build-only advisories and runtime maintenance requirements.
+
 ## Complete catalog snapshot
 
 The full mapping catalog needs an initial download, then uses IndexedDB offline.

@@ -20,7 +20,8 @@ import { resolveColor } from "../formats/colors";
 import { editImported, enrichImportedGeometry, moveImported, placePreparedPart, placeInventoryPart, prepareLibraryPart, recolorImported, rotateImported, type PreparedPart } from "./ldraw-editing";
 import { inheritStackingBounds } from "../engine/stacking";
 import { constructionTransform } from "../connections/engine";
-import type { Affine } from "../formats/types";
+import type { Affine, ImportedModel } from "../formats/types";
+import { groundedTransform, modelGround } from "./positioning";
 import type { Inventory, InventoryChoice } from "../inventory/types";
 import { replaceInventory, requireAvailable } from "../inventory/accounting";
 import {
@@ -48,6 +49,16 @@ export function useBuilder() {
   const [history, setHistory] = useState<HistoryState>(() =>
     createHistory(createEmptyDocument()),
   );
+  const groundRef = useRef<{ initial?: ImportedModel; floor?: number }>({});
+  useEffect(() => {
+    groundRef.current = { initial: history.document.imported };
+  }, [history.document.id, history.document.imported?.originalBytes]);
+  const constructionGround = useCallback((model: ImportedModel) => {
+    const state = groundRef.current;
+    // Evaluate lazily, but retain the initial scene floor through edits and undo.
+    state.floor ??= modelGround(state.initial ? { ...state.initial, resources: model.resources } : model);
+    return state.floor;
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<BrickType>("brick-2x4");
   const [selectedColor, setSelectedColorValue] = useState("#B40000");
@@ -319,7 +330,13 @@ export function useBuilder() {
   const move = useCallback(
     (id: string, position: Position3, transform?: Affine) => {
       if (historyRef.current.document.imported?.instances.some(instance => instance.id === id)) {
-        updateDocument(document => moveImported(document, id, position, false, transform));
+        try { updateDocument(document => {
+          const model = document.imported!;
+          const matrix = groundedTransform(model, id, position, constructionGround(model), transform);
+          const original = model.instances.find(instance => instance.id === id)!;
+          if (matrix.every((value, index) => Math.abs(value - original.matrix[index]) < 1e-10)) return document;
+          return moveImported(document, id, position, false, matrix);
+        }); } catch (error) { setPartError(error instanceof Error ? error.message : String(error)); }
         return;
       }
       const snapped = snapPosition(position);
@@ -342,7 +359,7 @@ export function useBuilder() {
         ),
       }));
     },
-    [updateDocument],
+    [updateDocument, constructionGround],
   );
 
   const remove = useCallback(
@@ -362,18 +379,31 @@ export function useBuilder() {
     [updateDocument],
   );
 
-  // Explicit vertical edits bypass auto-stacking so users retain full height control.
-  const changeHeight = useCallback((delta: number) => {
-    if (!selectedId) return;
+  // Explicit adjustments bypass snapping/stacking, but never the construction floor.
+  const nudgeSelected = useCallback((delta: Position3) => {
+    if (!selectedId || ![delta.x, delta.y, delta.z].every(Number.isFinite)) return;
     const document = historyRef.current.document;
     const instance = document.imported?.instances.find(value => value.id === selectedId);
     const brick = document.bricks.find(value => value.id === selectedId);
-    if (instance) move(selectedId, { x: instance.matrix[3] / 20, y: -instance.matrix[7] / 20 + delta, z: instance.matrix[11] / 20 });
-    else if (brick) updateDocument(current => ({
-      ...current, updatedAt: new Date().toISOString(),
-      bricks: current.bricks.map(value => value.id === selectedId ? { ...value, y: value.y + delta } : value),
-    }));
+    if (instance) {
+      const matrix = [...instance.matrix] as Affine;
+      for (const [index, amount] of [[3, delta.x * 20], [7, -delta.y * 20], [11, delta.z * 20]]) {
+        if (amount) matrix[index] = Number((matrix[index] + amount).toFixed(10));
+      }
+      move(selectedId, { x: matrix[3] / 20, y: -matrix[7] / 20, z: matrix[11] / 20 }, matrix);
+    } else if (brick) {
+      const next = {
+        ...brick, x: Number((brick.x + delta.x).toFixed(10)), y: Math.max(0, Number((brick.y + delta.y).toFixed(10))),
+        z: Number((brick.z + delta.z).toFixed(10)),
+      };
+      if (next.x === brick.x && next.y === brick.y && next.z === brick.z) return;
+      updateDocument(current => ({
+        ...current, updatedAt: new Date().toISOString(),
+        bricks: current.bricks.map(value => value.id === selectedId ? next : value),
+      }));
+    }
   }, [selectedId, move, updateDocument]);
+  const changeHeight = useCallback((delta: number) => nudgeSelected({ x: 0, y: delta, z: 0 }), [nudgeSelected]);
 
   const select = useCallback(
     (id: string | null) => {
@@ -547,6 +577,7 @@ export function useBuilder() {
     place,
     move,
     changeHeight,
+    nudgeSelected,
     rotateSelected,
     deleteSelected,
     undo: undoChange,

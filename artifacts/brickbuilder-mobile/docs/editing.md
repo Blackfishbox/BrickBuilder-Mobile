@@ -16,6 +16,13 @@ brick. Install a parts package and cache its geometry before working offline.
    plane, or delete the selected instance. Imported source transforms and pivots
    are preserved; movement snaps to half-stud X/Z increments.
 4. Undo and redo apply to imported instances as well as legacy saved bricks.
+
+Use **Fein** in the selection controls for six world-axis adjustments
+(X−/X+, Z−/Z+, Y−/Y+). Each tap moves the selected part by 1 LDU (0.4 mm),
+without grid rounding or magnetic snapping. The existing height buttons move
+by one plate height. Manual movement is limited by the part's transformed
+bottom surface at the visible construction ground, including rotated parts
+and models with negative original LDraw coordinates.
    Autosave and explicit saving preserve the effective model in IndexedDB.
 5. Open **Steine**, choose a library part, and tap the construction surface to
    place the resolved LDraw geometry in the active color.

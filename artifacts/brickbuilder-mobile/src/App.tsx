@@ -3,6 +3,7 @@ import { catalogPalette } from '@/features/formats/colors';
 import { useCatalog } from '@/features/catalog/client';
 import { importDiagnostics } from '@/features/formats/import-diagnostics';
 import { useBuilder } from '@/features/editor/useBuilder';
+import FinePositionControls from '@/features/editor/FinePositionControls';
 import {
   BRICK_DEFINITIONS,
   type BrickType,
@@ -295,6 +296,7 @@ function App() {
               <span className="mobile-selection-label"><Box size={14} /> {editor.selectedInstance ? `LDraw ${editor.selectedInstance.part.ldrawId}` : "Stein ausgewählt"}</span>
               <button type="button" onClick={() => editor.changeHeight(0.4)} aria-label="Stein eine Plattenhöhe höher" title="Höher (+1 Platte)">↑</button>
               <button type="button" onClick={() => editor.changeHeight(-0.4)} aria-label="Stein eine Plattenhöhe tiefer" title="Tiefer (−1 Platte)">↓</button>
+              <FinePositionControls key={editor.selectedId} onNudge={editor.nudgeSelected} />
               <button type="button" onClick={editor.rotateSelected} aria-label="Ausgewählten Stein drehen" data-testid="mobile-button-rotate"><RotateCw size={17} /></button>
               <button type="button" onClick={editor.deleteSelected} aria-label="Ausgewählten Stein entfernen" data-testid="mobile-button-delete-selected"><Trash2 size={17} /></button>
             </div>
@@ -372,6 +374,7 @@ function App() {
                     <Trash2 size={16} /><span>Entfernen</span>
                   </button>
                 </div>
+                <FinePositionControls key={editor.selectedId} onNudge={editor.nudgeSelected} />
               </>
             ) : (
               <div className="selection-empty" data-testid="status-no-selection">
