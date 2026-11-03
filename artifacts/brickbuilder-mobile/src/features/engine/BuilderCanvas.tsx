@@ -441,10 +441,18 @@ export function BuilderCanvas({
   const [showConnections, setShowConnections] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("");
   const [floatingCount, setFloatingCount] = useState(0);
+  const [showFloating, setShowFloating] = useState(false);
+  const showFloatingRef = useRef(false);
+  showFloatingRef.current = showFloating;
   const floatingCacheRef = useRef<{ source: ImportedModel | Brick[]; floor: number; boxes: Map<string, Box3> } | null>(null);
   const refreshFloating = () => {
     const overlay = overlayRef.current, model = propsRef.current.imported;
     if (!overlay) return;
+    if (!showFloatingRef.current) {
+      overlay.floating = new Map(); setFloatingCount(0);
+      invalidatorRef.current?.();
+      return;
+    }
     if (model && model !== sceneModelRef.current) {
       overlay.floating = new Map(); setFloatingCount(0); return;
     }
@@ -839,6 +847,7 @@ export function BuilderCanvas({
 
   useEffect(() => { updateImportedSelection(); }, [selectedId]);
   useEffect(() => { refreshFloating(); }, [bricks]);
+  useEffect(() => { refreshFloating(); }, [showFloating]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -1276,18 +1285,24 @@ export function BuilderCanvas({
     ? "Kompatibilitätsansicht ohne WebGL: begrenzte Details bei großen Projekten; alle Steine bleiben gespeichert."
     : null;
   return <div ref={hostRef} className="builder-canvas" data-testid="canvas-3d" style={{ position: "relative" }}>
-    {floatingCount > 0 && <div role="status" aria-live="polite" data-testid="floating-warning"
+    {showFloating && floatingCount > 0 && <div role="status" aria-live="polite" data-testid="floating-warning"
       className="absolute left-2 right-2 top-2 z-10 rounded-lg border border-red-300 bg-red-50/95 p-3 text-xs text-red-900 shadow"
       style={{ pointerEvents: "none", top: sceneStatus || renderWarning || compatibilityHint ? 100 : 8 }}>
       <strong>{floatingCount} {floatingCount === 1 ? "Teil schwebt möglicherweise" : "Teile schweben möglicherweise"} · rot markiert</strong>
       <p>Keine geometrische Verbindung zum Boden gefunden. Kontaktprüfung anhand der Geometriegrenzen, keine Statikprüfung.</p>
     </div>}
-    <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-2 pointer-events-none">
+    <div className="absolute bottom-2 left-2 right-2 z-10 flex flex-wrap items-center gap-2 pointer-events-none">
       <button type="button" className="pointer-events-auto rounded-xl border bg-white/95 px-3 py-3 text-xs font-semibold shadow-sm"
         aria-pressed={showConnections} aria-label="Verbindungen anzeigen"
         onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()}
         onClick={() => setShowConnections(value => !value)}>
         Verbindungen {showConnections ? "an" : "aus"}
+      </button>
+      <button type="button" className="pointer-events-auto rounded-xl border bg-white/95 px-3 py-3 text-xs font-semibold shadow-sm"
+        aria-pressed={showFloating} aria-label="Schwebewarnung anzeigen"
+        onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()}
+        onClick={() => setShowFloating(value => !value)}>
+        Schwebewarnung {showFloating ? "an" : "aus"}
       </button>
       {showConnections && connectionStatus && <span role="status" data-testid="connection-status" className="rounded-lg bg-white/95 px-2 py-2 text-xs shadow-sm">{connectionStatus}</span>}
     </div>

@@ -1,7 +1,11 @@
 # Floating-part warnings
 
-The construction view automatically marks possibly floating parts with red
-frames and an exclamation mark, and shows their total count. Markers remain
+Floating-part diagnostics are off by default. Enable them using
+**Schwebewarnung aus/an** in the construction view. While enabled, the view
+marks possibly floating parts with red frames and an exclamation mark, and
+shows their total count. Switching them off clears warnings and markers and
+skips the contact analysis. The toggle resets to off when the view is reopened.
+Markers remain
 visible when connection markers are switched off and never intercept gestures.
 Changes, deletion, undo and redo recompute support from the committed model.
 
