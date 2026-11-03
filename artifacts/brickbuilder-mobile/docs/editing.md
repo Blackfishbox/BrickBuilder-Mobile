@@ -1,3 +1,21 @@
+# Floating-part warnings
+
+The construction view automatically marks possibly floating parts with red
+frames and an exclamation mark, and shows their total count. Markers remain
+visible when connection markers are switched off and never intercept gestures.
+Changes, deletion, undo and redo recompute support from the committed model.
+
+Support propagates through touching geometric bounds to the visible ground,
+including sideways attachments. Entire disconnected assemblies are reported.
+Imported models retain their original coordinate system and visible ground.
+Spatial buckets keep ordinary large models from requiring all-pairs checks.
+
+This is a conservative contact diagnostic, not a physics simulation or proof
+of LEGO connectivity. Rotated or irregular parts can have touching bounding
+boxes without actual surface contact; those cases may not be reported.
+Missing/unresolved geometry is excluded and remains covered by import warnings.
+The warning reflects the committed placement rather than a temporary drag preview.
+
 # Editing LDraw models
 
 The part picker shows only the installed LDraw library. There is no separate

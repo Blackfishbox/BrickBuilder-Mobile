@@ -36,6 +36,8 @@ import { InstanceIndex, instanceIndex } from "./instance-index";
 import { activeConnections, magneticConstructionTransform, hasUsableConnections } from "../connections/engine";
 import type { MagneticLatch } from "../connections/engine";
 import { ConnectionOverlay } from "../connections/overlay";
+import { floatingParts, legacyBrickBounds } from "./floating";
+import { stackingBounds } from "./stacking";
 import type { ConnectionTransform } from "../connections/types";
 import { createBuilderLighting } from "./lighting";
 import type { Affine, ImportedModel } from "../formats/types";
@@ -438,7 +440,26 @@ export function BuilderCanvas({
   const overlayRef = useRef<ConnectionOverlay | null>(null);
   const [showConnections, setShowConnections] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("");
+  const [floatingCount, setFloatingCount] = useState(0);
+  const floatingCacheRef = useRef<{ source: ImportedModel | Brick[]; floor: number; boxes: Map<string, Box3> } | null>(null);
+  const refreshFloating = () => {
+    const overlay = overlayRef.current, model = propsRef.current.imported;
+    if (!overlay) return;
+    if (model && model !== sceneModelRef.current) {
+      overlay.floating = new Map(); setFloatingCount(0); return;
+    }
+    const source = model ?? propsRef.current.bricks, floor = model ? -importedOffsetRef.current : 0;
+    let cached = floatingCacheRef.current;
+    if (!cached || cached.source !== source || cached.floor !== floor) {
+      cached = { source, floor, boxes: floatingParts(model ? stackingBounds(model) : legacyBrickBounds(propsRef.current.bricks), floor) };
+      floatingCacheRef.current = cached;
+    }
+    overlay.floating = cached.boxes;
+    setFloatingCount(cached.boxes.size);
+    invalidatorRef.current?.();
+  };
   const refreshConnections = () => {
+    refreshFloating();
     const overlay = overlayRef.current, model = propsRef.current.imported, id = propsRef.current.selectedId;
     if (!overlay) return;
     if (model !== sceneModelRef.current) { overlay.contacts = []; setConnectionStatus(""); return; }
@@ -717,6 +738,7 @@ export function BuilderCanvas({
         importedRootRef.current = null; softwareSceneRef.current = undefined;
         importedBoundsRef.current = null; importedOffsetRef.current = 0; sceneModelRef.current = undefined;
         updateImportedSelection();
+        refreshConnections();
         return;
       }
       let lastProgress = 0;
@@ -816,6 +838,7 @@ export function BuilderCanvas({
   }, [showConnections]);
 
   useEffect(() => { updateImportedSelection(); }, [selectedId]);
+  useEffect(() => { refreshFloating(); }, [bricks]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -1253,6 +1276,12 @@ export function BuilderCanvas({
     ? "Kompatibilitätsansicht ohne WebGL: begrenzte Details bei großen Projekten; alle Steine bleiben gespeichert."
     : null;
   return <div ref={hostRef} className="builder-canvas" data-testid="canvas-3d" style={{ position: "relative" }}>
+    {floatingCount > 0 && <div role="status" aria-live="polite" data-testid="floating-warning"
+      className="absolute left-2 right-2 top-2 z-10 rounded-lg border border-red-300 bg-red-50/95 p-3 text-xs text-red-900 shadow"
+      style={{ pointerEvents: "none", top: sceneStatus || renderWarning || compatibilityHint ? 100 : 8 }}>
+      <strong>{floatingCount} {floatingCount === 1 ? "Teil schwebt möglicherweise" : "Teile schweben möglicherweise"} · rot markiert</strong>
+      <p>Keine geometrische Verbindung zum Boden gefunden. Kontaktprüfung anhand der Geometriegrenzen, keine Statikprüfung.</p>
+    </div>}
     <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-2 pointer-events-none">
       <button type="button" className="pointer-events-auto rounded-xl border bg-white/95 px-3 py-3 text-xs font-semibold shadow-sm"
         aria-pressed={showConnections} aria-label="Verbindungen anzeigen"
