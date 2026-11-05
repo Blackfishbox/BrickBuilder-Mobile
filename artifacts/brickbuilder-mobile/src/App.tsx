@@ -40,6 +40,7 @@ import FormatDialog from '@/features/formats/FormatDialog';
 import ImportPartNotification from '@/features/formats/ImportPartNotification';
 import StorageManager from '@/features/storage/StorageManager';
 import InventoryPanel from '@/features/inventory/InventoryPanel';
+import PrivacyDialog from '@/features/privacy/PrivacyDialog';
 
 const BRICKS = Object.entries(BRICK_DEFINITIONS).map(([type, definition]) => ({
   type: type as BrickType,
@@ -63,6 +64,7 @@ function App() {
   const [saveMessage, setSaveMessage] = useState('');
   const [formatsOpen, setFormatsOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [partsTab, setPartsTab] = useState<'ldraw' | 'inventory'>('ldraw');
   const activeInventoryRow = editor.selectedInventory && editor.document.inventory?.id === editor.selectedInventory.listId
     ? editor.document.inventory.rows.find(row => row.id === editor.selectedInventory!.rowId) : undefined;
@@ -202,6 +204,9 @@ function App() {
               </button>
               <button type="button" className="popover-action" onClick={() => { setStorageOpen(true); setProjectMenu(false); }} data-testid="button-open-storage">
                 <HardDrive size={16} /> Offline-Speicher verwalten
+              </button>
+              <button type="button" className="popover-action" onClick={() => { setPrivacyOpen(true); setProjectMenu(false); }} data-testid="button-open-privacy">
+                <FilePlus2 size={16} /> Datenschutz (Android)
               </button>
               <div className="saved-projects" aria-label="Gespeicherte Projekte">
                 <p>Auf diesem Gerät</p>
@@ -505,6 +510,7 @@ function App() {
       )}
       {formatsOpen && <FormatDialog document={editor.document} onClose={() => setFormatsOpen(false)} onImport={editor.importProject} onResolved={editor.resolveImportedProject} />}
       {storageOpen && <StorageManager currentProjectId={editor.document.id} onClose={() => setStorageOpen(false)} onProjectsChanged={editor.refreshProjects} />}
+      {privacyOpen && <PrivacyDialog onClose={() => setPrivacyOpen(false)} />}
       {!formatsOpen && (
         <ImportPartNotification key={editor.document.id} model={editor.imported} floating />
       )}
