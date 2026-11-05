@@ -37,7 +37,7 @@ export default defineConfig({
     VitePWA({
       disable: process.env.VITE_NATIVE_ANDROID === 'true',
       registerType: 'autoUpdate',
-      includeAssets: ['icons/brickbuilder.svg'],
+      includeAssets: ['icons/brickbuilder-192.png', 'icons/brickbuilder-512.png'],
       manifest: {
         name: 'BrickBuilder Mobile',
         short_name: 'BrickBuilder',
@@ -51,10 +51,16 @@ export default defineConfig({
         theme_color: '#214a42',
         icons: [
           {
-            src: 'icons/brickbuilder.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
+            src: 'icons/brickbuilder-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/brickbuilder-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
           },
         ],
       },

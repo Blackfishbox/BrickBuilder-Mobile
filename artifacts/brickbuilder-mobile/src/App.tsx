@@ -18,7 +18,6 @@ import {
   Command,
   FilePlus2,
   HardDrive,
-  Grid2X2,
   Hammer,
   Layers3,
   LoaderCircle,
@@ -161,7 +160,9 @@ function App() {
     <main className="editor-shell workbench-grain" data-testid="editor-workspace">
       <header className="topbar">
         <div className="brand-lockup">
-          <div className="brand-mark" aria-hidden="true"><Grid2X2 size={19} strokeWidth={2.3} /></div>
+          <div className="brand-mark" aria-hidden="true">
+            <img src={`${import.meta.env.BASE_URL}icons/brickbuilder-512.png`} alt="" width={30} height={30} />
+          </div>
           <span className="brand-name">brick<span>builder</span></span>
           <span className="brand-edition">MOBILE</span>
         </div>
