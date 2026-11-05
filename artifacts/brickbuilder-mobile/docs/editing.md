@@ -1,3 +1,25 @@
+# Floating-part warnings
+
+Floating-part diagnostics are off by default. Enable them using
+**Schwebewarnung aus/an** in the construction view. While enabled, the view
+marks possibly floating parts with red frames and an exclamation mark, and
+shows their total count. Switching them off clears warnings and markers and
+skips the contact analysis. The toggle resets to off when the view is reopened.
+Markers remain
+visible when connection markers are switched off and never intercept gestures.
+Changes, deletion, undo and redo recompute support from the committed model.
+
+Support propagates through touching geometric bounds to the visible ground,
+including sideways attachments. Entire disconnected assemblies are reported.
+Imported models retain their original coordinate system and visible ground.
+Spatial buckets keep ordinary large models from requiring all-pairs checks.
+
+This is a conservative contact diagnostic, not a physics simulation or proof
+of LEGO connectivity. Rotated or irregular parts can have touching bounding
+boxes without actual surface contact; those cases may not be reported.
+Missing/unresolved geometry is excluded and remains covered by import warnings.
+The warning reflects the committed placement rather than a temporary drag preview.
+
 # Editing LDraw models
 
 The part picker shows only the installed LDraw library. There is no separate
@@ -16,6 +38,13 @@ brick. Install a parts package and cache its geometry before working offline.
    plane, or delete the selected instance. Imported source transforms and pivots
    are preserved; movement snaps to half-stud X/Z increments.
 4. Undo and redo apply to imported instances as well as legacy saved bricks.
+
+Use **Fein** in the selection controls for six world-axis adjustments
+(X−/X+, Z−/Z+, Y−/Y+). Each tap moves the selected part by 1 LDU (0.4 mm),
+without grid rounding or magnetic snapping. The existing height buttons move
+by one plate height. Manual movement is limited by the part's transformed
+bottom surface at the visible construction ground, including rotated parts
+and models with negative original LDraw coordinates.
    Autosave and explicit saving preserve the effective model in IndexedDB.
 5. Open **Steine**, choose a library part, and tap the construction surface to
    place the resolved LDraw geometry in the active color.

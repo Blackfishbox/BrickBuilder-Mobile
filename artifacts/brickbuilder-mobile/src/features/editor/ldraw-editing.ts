@@ -7,6 +7,7 @@ import { importLDraw } from "../formats/ldraw/import";
 import { compilePart, worldMatrix } from "../engine/ldraw-geometry";
 import type { InventoryChoice } from "../inventory/types";
 import { requireAvailable } from "../inventory/accounting";
+import { getImportPartFailures } from "../formats/import-failures";
 
 export interface PreparedPart {
   part: LibraryPart;
@@ -21,10 +22,15 @@ export function appearanceCode(hex: string, code?: string): string {
 export async function prepareLibraryPart(part: LibraryPart, signal?: AbortSignal): Promise<PreparedPart> {
   const reference = `${part.ldrawId.replace(/\.dat$/i, "")}.dat`;
   const bytes = new TextEncoder().encode(`0 LDraw placement\n1 7 0 0 0 1 0 0 0 1 0 0 0 1 ${reference}\n`);
-  const document = await importLDraw(bytes, "placement.ldr", "ldr", bytes, { signal });
+  const document = await importLDraw(bytes, "placement.ldr", "ldr", bytes, { signal, online: true, retry: true });
   signal?.throwIfAborted();
   const model = document.imported!, instance = model.instances[0];
-  if (!instance || instance.part.status !== "resolved") throw new Error(`LDraw ${part.ldrawId}: Geometrie ist nicht offline vorhanden und konnte nicht geladen werden.`);
+  if (!instance || instance.part.status !== "resolved") {
+    const reasons = getImportPartFailures(model).flatMap(failure => failure.reasons);
+    throw new Error(`LDraw ${part.ldrawId}: Geometrie konnte nicht geladen werden. ${
+      reasons.join(" ") || "Keine vollständige Geometrie verfügbar."
+    }`);
+  }
   const bounds = new Box3(), point = new Vector3(), matrix = worldMatrix(instance.matrix);
   for (const surface of compilePart(model, reference, "16")) {
     for (let i = 0; i < surface.positions.length; i += 3) bounds.expandByPoint(point.fromArray(surface.positions, i).applyMatrix4(matrix));

@@ -87,4 +87,42 @@ it("commits inventory snapping once and preserves exact height through manual ed
   });
   expect(editor.imported!.sourceText).toBe(base.sourceText);
   expect(editor.imported!.originalBytes).toEqual(base.originalBytes);
+  for (let i = 0; i < 10; i++) await act(async () => editor.changeHeight(-0.4));
+  expect(editor.imported!.instances.find(instance => instance.id === id)!.matrix[7]).toBeCloseTo(-8);
+  const floorDocument = editor.document;
+  await act(async () => editor.changeHeight(-0.4));
+  expect(editor.document).toBe(floorDocument);
+  await act(async () => editor.nudgeSelected({ x: 0.05, y: 0.05, z: -0.05 }));
+  const fine = editor.imported!.instances.find(instance => instance.id === id)!;
+  expect(fine.matrix[3]).toBeCloseTo(5.6);
+  expect(fine.matrix[7]).toBeCloseTo(-9);
+  expect(fine.matrix[11]).toBeCloseTo(2.4);
+  expect(allocatedCounts(editor.document).get(inventory.rows[0].id)).toBe(1);
+  await act(async () => editor.undo());
+  expect(editor.document).toBe(floorDocument);
+  await act(async () => editor.redo());
+  await act(async () => { await editor.save(); });
+  expect((await loadProject(editor.document.id))!.imported!.instances.find(instance => instance.id === id)).toEqual(fine);
+});
+
+it("clamps legacy saved bricks and allows fine steps without grid rounding", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("Worker", class { addEventListener() {} postMessage() {} terminate() {} });
+  await builderDatabase.open();
+  let editor!: ReturnType<typeof useBuilder>;
+  function Harness() { editor = useBuilder(); return null; }
+  root = createRoot(document.createElement("div"));
+  await act(async () => root!.render(<Harness />));
+  await act(async () => { await vi.waitFor(() => expect(editor.isReady).toBe(true)); });
+  const legacyDocument = createEmptyDocument();
+  legacyDocument.bricks = [{ id: "legacy", type: "brick-1x2", color: "#B40000", x: 0, y: 0, z: 0, rotation: 0 }];
+  await act(async () => editor.importProject(legacyDocument));
+  await act(async () => editor.select("legacy"));
+  const before = editor.document;
+  await act(async () => editor.changeHeight(-0.4));
+  expect(editor.document).toBe(before);
+  await act(async () => editor.nudgeSelected({ x: 0.05, y: 0.05, z: -0.05 }));
+  expect(editor.document.bricks[0]).toMatchObject({ x: 0.05, y: 0.05, z: -0.05 });
+  await act(async () => editor.changeHeight(-0.4));
+  expect(editor.document.bricks[0].y).toBe(0);
 });

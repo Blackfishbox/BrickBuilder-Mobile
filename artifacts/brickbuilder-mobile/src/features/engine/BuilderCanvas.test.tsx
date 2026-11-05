@@ -87,6 +87,21 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); element.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("frame-coalesced drag transactions", () => {
+  it("keeps floating diagnostics off by default and enables and clears them on demand", () => {
+    const props = { bricks: [{ id: "air", type: "brick-1x2" as const, color: "#fff", x: 0, y: 3, z: 0, rotation: 0 }],
+      selectedId: null, selectedType: "brick-1x2" as const, selectedColor: "#fff", toolMode: "select" as const,
+      onMove: vi.fn(), onSelect: vi.fn(), onPlace: vi.fn() };
+    act(() => root.render(<BuilderCanvas {...props} />));
+    const toggle = element.querySelector<HTMLButtonElement>("[aria-label='Schwebewarnung anzeigen']")!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(element.querySelector("[data-testid='floating-warning']")).toBeNull();
+    act(() => toggle.click());
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(element.querySelector("[data-testid='floating-warning']")?.textContent).toContain("1 Teil");
+    act(() => toggle.click());
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(element.querySelector("[data-testid='floating-warning']")).toBeNull();
+  });
   it("drags real catalog plate geometry onto both rows with live contacts and identical committed rendering", async () => {
     const snapshot = JSON.parse(new TextDecoder().decode(gunzipSync(readFileSync(resolve("public/parts/import-geometry-2026-10-31.bin")))));
     const sourceText = "1 4 0 -8 0 1 0 0 0 1 0 0 0 1 3795.dat\n1 7 80 -8 0 1 0 0 0 1 0 0 0 1 3023b.dat";

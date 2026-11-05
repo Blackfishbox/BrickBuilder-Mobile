@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -9,6 +9,23 @@ import { LDrawProvider } from "./ldraw-provider.ts";
 const valid = "0 Test\n0 Author: Test Author\n0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt\n3 16 0 0 0 1 0 0 0 1 0\n";
 const sha = data => createHash("sha256").update(data).digest("hex");
 describe("restricted source provider", () => {
+  it("rejects traversal and symlinks outside the approved archive before reading file bytes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ldraw-boundary-"));
+    try {
+      const archive = join(root, "archive");
+      await mkdir(join(archive, "parts"), { recursive: true });
+      await writeFile(join(root, "outside.dat"), valid);
+      await symlink(join(root, "outside.dat"), join(archive, "parts/a.dat"));
+      await writeFile(join(archive, "manifest.json"), JSON.stringify({
+        version: 1, sha256: "a".repeat(64), files: { "parts/a.dat": sha(valid) },
+      }));
+      const provider = new LDrawProvider(async () => { throw new Error("No network allowed"); }, archive);
+      for (const path of ["../outside.dat", "parts/../../outside.dat", "parts/%2e%2e/outside.dat", "/etc/passwd"]) {
+        assert.throws(() => provider.get(path));
+      }
+      await assert.rejects(provider.get("parts/a.dat"), e => e.status === 502);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it("deduplicates exact bytes and pins fixed source identities", async () => {
     let calls = 0;
     const provider = new LDrawProvider(async url => {

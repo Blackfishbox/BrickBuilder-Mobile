@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { isIP } from "node:net";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +16,15 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+// The self-hosted service binds loopback; managed previews retain the default.
+const host = process.env["HOST"] ?? "0.0.0.0";
+if (!isIP(host)) throw new Error("HOST must be a literal IPv4 or IPv6 address.");
+
+app.listen(port, host, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  logger.info({ host, port }, "Server listening");
 });

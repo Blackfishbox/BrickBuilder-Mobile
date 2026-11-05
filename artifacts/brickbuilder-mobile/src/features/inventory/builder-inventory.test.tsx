@@ -9,6 +9,7 @@ import { allocatedCounts } from "./accounting";
 import { parseLDraw } from "../formats/ldraw/parser";
 import { prepareLibraryPart, type PreparedPart } from "../editor/ldraw-editing";
 import { builderDatabase } from "@/storage/database";
+import InventoryPanel from "./InventoryPanel";
 
 vi.mock("../catalog/client", () => ({
   useCatalog: () => ({ status: "ready" }),
@@ -37,13 +38,20 @@ it("handles failed/cancelled loading, fast taps, stale source colors, catalog ex
   vi.stubGlobal("Worker", class { addEventListener() {} postMessage() {} terminate() {} });
   await builderDatabase.open();
   let editor!: ReturnType<typeof useBuilder>;
-  function Harness() { editor = useBuilder(); return null; }
-  root = createRoot(document.createElement("div"));
+  function Harness() {
+    editor = useBuilder();
+    return <InventoryPanel document={editor.document} selected={editor.selectedInventory}
+      onSelect={editor.selectInventoryPart} onReplace={editor.replacePartsInventory} onSelected={() => {}} />;
+  }
+  const container = document.createElement("div");
+  root = createRoot(container);
   await act(async () => { root!.render(<Harness />); });
   await act(async () => { await vi.waitFor(() => expect(editor.isReady).toBe(true)); });
   const inventory = parseInventory("part_id,color_id,quantity\n3001,5,1", "self-authored.csv");
   await act(async () => editor.replacePartsInventory(inventory, editor.document.id));
   const choice = { listId: inventory.id, rowId: inventory.rows[0].id, ldrawId: "test", colorCode: "4" };
+  const visibleRow = () => container.querySelector(`[data-testid="row-inventory-${choice.rowId}"]`);
+  expect(visibleRow()).not.toBeNull();
   const part = { id: "test", packageId: "test", ldrawId: "test", name: "Synthetic", category: "", keywords: [], file: "parts/test.dat" };
   const prepared: PreparedPart = { part, bottom: -1, model: {
     version: 1, format: "ldr", sourceName: "synthetic.ldr", sourceText: "0 Synthetic", originalBytes: [],
@@ -72,16 +80,21 @@ it("handles failed/cancelled loading, fast taps, stale source colors, catalog ex
   expect(editor.brickCount).toBe(1);
   expect(editor.imported!.instances[0].colorCode).toBe("4");
   expect(allocatedCounts(editor.document).get(choice.rowId)).toBe(1);
+  expect(visibleRow()).toBeNull();
+  expect(container.textContent).toContain("Alle Teile dieser Liste sind verbaut");
   expect(editor.partError).toContain("aufgebraucht");
   await act(async () => editor.setSelectedColor("#1E5AA8", "1"));
   expect(editor.imported!.instances[0].colorCode).toBe("1");
   expect(allocatedCounts(editor.document).get(choice.rowId)).toBe(1);
   await act(async () => editor.deleteSelected());
   expect(allocatedCounts(editor.document).size).toBe(0);
+  expect(visibleRow()).not.toBeNull();
   await act(async () => editor.undo());
   expect(allocatedCounts(editor.document).get(choice.rowId)).toBe(1);
+  expect(visibleRow()).toBeNull();
   await act(async () => editor.redo());
   expect(allocatedCounts(editor.document).size).toBe(0);
+  expect(visibleRow()).not.toBeNull();
   await act(async () => editor.undo());
   await act(async () => { expect(await editor.selectLibraryPart(part)).toBe(true); });
   expect(editor.selectedInventory).toBeNull();
@@ -89,6 +102,11 @@ it("handles failed/cancelled loading, fast taps, stale source colors, catalog ex
   expect(editor.brickCount).toBe(2);
   expect(allocatedCounts(editor.document).get(choice.rowId)).toBe(1);
   expect(editor.imported!.instances[1].allocation).toBeUndefined();
+  expect(visibleRow()).toBeNull();
+  await act(async () => editor.deleteSelected());
+  expect(allocatedCounts(editor.document).get(choice.rowId)).toBe(1);
+  expect(visibleRow()).toBeNull();
+  await act(async () => editor.undo());
 
   const firstId = editor.document.id;
   const staleChoice = { ...choice };

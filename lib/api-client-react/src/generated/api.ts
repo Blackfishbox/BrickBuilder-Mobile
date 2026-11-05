@@ -9,8 +9,13 @@ import {
   useQuery
 } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
+  QueryClient,
   QueryFunction,
   QueryKey,
+  UndefinedInitialDataOptions,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -80,7 +85,7 @@ export const getGetMappingCatalogSnapshotQueryKey = (sha256: string,) => {
     }
 
 
-export const getGetMappingCatalogSnapshotQueryOptions = <TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(sha256: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetMappingCatalogSnapshotQueryOptions = <TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -95,25 +100,49 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
 
 
-   return  { queryKey, queryFn, enabled: sha256 !== null && sha256 !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: sha256 !== null && sha256 !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetMappingCatalogSnapshotQueryResult = NonNullable<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>>
 export type GetMappingCatalogSnapshotQueryError = ErrorType<void>
 
 
+export function useGetMappingCatalogSnapshot<TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(
+ sha256: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMappingCatalogSnapshot>>,
+          TError,
+          Awaited<ReturnType<typeof getMappingCatalogSnapshot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMappingCatalogSnapshot<TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(
+ sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMappingCatalogSnapshot>>,
+          TError,
+          Awaited<ReturnType<typeof getMappingCatalogSnapshot>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMappingCatalogSnapshot<TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(
+ sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Read the pinned complete public catalog mapping snapshot
  */
 
 export function useGetMappingCatalogSnapshot<TData = Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError = ErrorType<void>>(
- sha256: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMappingCatalogSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetMappingCatalogSnapshotQueryOptions(sha256,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
@@ -165,7 +194,7 @@ export const getGetLDrawFileQueryKey = (params?: GetLDrawFileParams,) => {
     }
 
 
-export const getGetLDrawFileQueryOptions = <TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(params: GetLDrawFileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetLDrawFileQueryOptions = <TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(params: GetLDrawFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -180,25 +209,49 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetLDrawFileQueryResult = NonNullable<Awaited<ReturnType<typeof getLDrawFile>>>
 export type GetLDrawFileQueryError = ErrorType<void>
 
 
+export function useGetLDrawFile<TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(
+ params: GetLDrawFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLDrawFile>>,
+          TError,
+          Awaited<ReturnType<typeof getLDrawFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLDrawFile<TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(
+ params: GetLDrawFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLDrawFile>>,
+          TError,
+          Awaited<ReturnType<typeof getLDrawFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLDrawFile<TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(
+ params: GetLDrawFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Read an approved original LDraw file
  */
 
 export function useGetLDrawFile<TData = Awaited<ReturnType<typeof getLDrawFile>>, TError = ErrorType<void>>(
- params: GetLDrawFileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+ params: GetLDrawFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLDrawFile>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetLDrawFileQueryOptions(params,options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
@@ -243,7 +296,7 @@ export const getHealthCheckQueryKey = () => {
     }
 
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -258,25 +311,49 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
 export type HealthCheckQueryError = ErrorType<unknown>
 
 
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof healthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof healthCheck>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof healthCheck>>,
+          TError,
+          Awaited<ReturnType<typeof healthCheck>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Health check
  */
 
 export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
 
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   return withQueryKey(query, queryOptions.queryKey);
 }

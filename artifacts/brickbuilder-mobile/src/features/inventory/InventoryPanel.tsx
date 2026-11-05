@@ -58,7 +58,7 @@ export default function InventoryPanel({ document, selected, onSelect, onReplace
     return () => { mounted.current = false; token.current++; };
   }, []);
   useEffect(() => { token.current++; setPreview(null); setImporting(false); setImportError(''); setPicks({}); }, [projectId]);
-  useEffect(() => { setPicks({}); setRowError(''); setBusyRow(''); }, [inventory?.id]);
+  useEffect(() => { setPicks({}); setRowError(''); setBusyRow(''); setPage(0); }, [inventory?.id]);
 
   useEffect(() => {
     if (!inventory) { setResolutions(null); return; }
@@ -108,16 +108,18 @@ export default function InventoryPanel({ document, selected, onSelect, onReplace
   };
 
   const rows = inventory?.rows ?? [];
+  const availableRows = useMemo(() => rows.filter(row => (counts.get(row.id) ?? 0) < row.quantity), [rows, counts]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(r => {
+    if (!q) return availableRows;
+    return availableRows.filter(r => {
       const res = resolutions?.[r.id];
       const hay = [r.partId, r.colorId, ...(res?.parts.map(p => `${p.ldrawId} ${p.name}`) ?? []), ...(res?.colors.map(c => c.name) ?? [])].join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, query, resolutions]);
+  }, [availableRows, query, resolutions]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  useEffect(() => { setPage(previous => Math.min(previous, pages - 1)); }, [pages]);
   const current = Math.min(page, pages - 1);
   const visible = filtered.slice(current * PAGE, current * PAGE + PAGE);
 
@@ -159,6 +161,7 @@ export default function InventoryPanel({ document, selected, onSelect, onReplace
 
       {inventory && <>
         <p className="inv-note">Die Farbe der Listenzeile bleibt an künftige Platzierungen gebunden. Spätere Farbänderungen an verbauten Teilen füllen den Bestand nicht auf.</p>
+        <p className="inv-note">Vollständig verbaute Positionen werden ausgeblendet. Löschen gibt sie wieder frei. Zusätzliche Steine kannst du jederzeit ohne Listenbegrenzung im Tab „LDraw-Katalog“ auswählen.</p>
         <div className="inv-search">
           <Search size={15} />
           <input value={query} onChange={e => { setQuery(e.target.value); setPage(0); }} placeholder="Name, BrickLink-Nr. oder Farbe" aria-label="Teileliste durchsuchen" data-testid="input-inventory-search" />
@@ -168,7 +171,9 @@ export default function InventoryPanel({ document, selected, onSelect, onReplace
         {!resolutions && !resolveError && <div className="inv-skeleton" aria-label="Zuordnungen werden geladen">{[0, 1, 2].map(i => <span key={i} />)}</div>}
         {rowError && <p className="inv-error" role="alert">{rowError}</p>}
         {resolutions && (filtered.length === 0
-          ? <p className="inv-empty">Keine Zeile passt zu „{query}“.</p>
+          ? <p className="inv-empty" role="status">{availableRows.length === 0
+            ? 'Alle Teile dieser Liste sind verbaut. Wenn du ein zugehöriges Teil löschst, erscheint es hier wieder. Im LDraw-Katalog kannst du weitere Steine ergänzen.'
+            : `Keine verfügbare Zeile passt zu „${query}“.`}</p>
           : <ul className="inv-rows" aria-label="Meine Teileliste">
             {visible.map(row => {
               const res = resolutions[row.id];

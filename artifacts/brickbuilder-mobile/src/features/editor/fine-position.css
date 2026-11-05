@@ -1,0 +1,11 @@
+.fine-position { position: relative; color: #365346; font-size: 12px; }
+.fine-position summary { cursor: pointer; padding: 12px; min-height: 44px; box-sizing: border-box; border-radius: 8px; background: #f0eee4; }
+.fine-position summary:focus-visible, .fine-position button:focus-visible { outline: 2px solid #214a42; outline-offset: 2px; }
+.fine-position-panel { display: grid; gap: 8px; padding: 10px; border: 1px solid #e1ddd0; border-radius: 10px; background: #faf8f0; }
+.fine-position-panel small { font-size: 10px; line-height: 1.5; }
+.fine-position-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fine-position-grid button { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: #e8ecdf; color: #365346; font-size: 12px; touch-action: manipulation; cursor: pointer; }
+@media (max-width: 900px) {
+  .mobile-selection-actions .fine-position-panel { position: absolute; top: calc(100% + 8px); right: 0; width: min(240px, calc(100vw - 48px)); max-height: calc(100dvh - 220px); overflow-y: auto; box-shadow: 0 4px 14px #27393024; }
+  .mobile-selection-actions .fine-position-grid button { width: 100%; height: auto; min-height: 44px; }
+}

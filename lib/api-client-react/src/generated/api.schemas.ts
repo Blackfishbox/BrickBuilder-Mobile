@@ -10,9 +10,7 @@ export interface HealthStatus {
 }
 
 export type GetLDrawFileParams = {
-/**
- * @maxLength 180
- */
-path: string;
+  /** @maxLength 180 */
+  path: string;
 };
 

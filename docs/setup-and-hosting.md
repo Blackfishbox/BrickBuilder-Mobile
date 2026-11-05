@@ -1,8 +1,14 @@
 # Setup and hosting
 
+Before exposing the optional API, read the
+[dependency security review](security-dependency-review.md) for the fixed
+versions, remaining build-only advisories and runtime maintenance requirements.
+
 ## Complete catalog snapshot
 
 The full mapping catalog needs an initial download, then uses IndexedDB offline.
+For hardware/disk estimates and a complete independent-host example, see the
+[root README self-hosting instructions](../README.md#self-hosting-requirements-and-sizing).
 The API serves only the pinned public object at the exact path in
 `artifacts/brickbuilder-mobile/src/features/catalog/manifest.json`. Existing
 App Storage service identity is used; no Rebrickable API key or paid catalog
@@ -28,6 +34,10 @@ with fabricated catalog data. The old verified subset can still support the
 editor, but cannot be described as full coverage.
 
 ## Scope and tested toolchain
+
+For an automated independent-host installation with preinstalled Nginx and an
+existing Certbot certificate, see [the installer guide](self-host-installer.md).
+Use `scripts/setup-self-host.sh --plan` to inspect the intended changes first.
 
 The editor can run as a standalone static browser application. An optional
 same-origin resolver downloads approved missing LDraw geometry during import;
@@ -74,6 +84,7 @@ merge hook that includes database/backup operations, not the app-only setup.
 | `PORT` | Frontend dev, build and preview | `4173` | Positive TCP port; the config checks it even during a static build |
 | `BASE_PATH` | Frontend dev, build and preview | `/` or `/brickbuilder/` | Public URL path, with leading and trailing `/` |
 | `PORT` | Optional API process | `5000` | Separate API listening port |
+| `HOST` | Optional API bind address | `127.0.0.1` | Literal IPv4/IPv6; defaults to `0.0.0.0` for managed previews |
 | `LDRAW_APPROVED_DIR` | Optional resolver archive mode | Absolute reviewed archive directory | Uses an immutable official archive instead of live per-file requests |
 | `DATABASE_URL` | Optional database library/schema tools | Your own PostgreSQL connection | Not used by the editor, health route or resolver |
 
@@ -90,6 +101,7 @@ Open <http://localhost:4173/>. Stop with Ctrl+C. The development server has
 the service worker disabled; it is not an offline/PWA acceptance environment.
 
 ```sh
+pnpm run typecheck:libs
 pnpm --filter @workspace/brickbuilder-mobile run typecheck
 pnpm --filter @workspace/brickbuilder-mobile run test
 PORT=4173 BASE_PATH=/ pnpm --filter @workspace/brickbuilder-mobile run build
@@ -249,10 +261,21 @@ and `/api/healthz`. A static host cannot run Express. On any Node-capable host:
 
 ```sh
 pnpm --filter @workspace/api-server run build
-PORT=5000 pnpm --filter @workspace/api-server run start
+# Prepare/review the archive first, as described below. Use its absolute path.
+NODE_ENV=production HOST=127.0.0.1 LDRAW_APPROVED_DIR=/absolute/path/to/ldraw-approved \
+  PORT=5000 pnpm --filter @workspace/api-server run start
 # Alternatively, build and start in development:
-PORT=5000 pnpm --filter @workspace/api-server run dev
+LDRAW_APPROVED_DIR=/absolute/path/to/ldraw-approved \
+  PORT=5000 pnpm --filter @workspace/api-server run dev
 ```
+
+Without `LDRAW_APPROVED_DIR`, the current API restores its archive using the
+Replit-specific storage credential broker before it begins listening. That
+default is not portable to an independent VPS. Its catalog route also uses
+that storage identity: self-host the catalog as a static file at the frontend
+manifest's exact path, with a more-specific reverse-proxy location than `/api/`.
+The root README includes a complete Nginx example. Never claim that simply
+starting this service on any host supplies the original private storage objects.
 
 The API already mounts routes below `/api`; its health endpoint is
 `http://localhost:5000/api/healthz`. A reverse proxy must preserve `/api/`
