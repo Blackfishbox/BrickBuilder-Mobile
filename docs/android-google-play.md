@@ -230,6 +230,22 @@ store graphics, publisher/privacy details and Play Console submission remain
 explicit release gates. A complete offline geometry expansion is not silently
 included or promised by this preparation.
 
+## Launcher artwork
+
+The launcher uses the shared transparent construction-brick icon from
+`artifacts/brickbuilder-mobile/public/icons/brickbuilder-512.png`.
+To regenerate the five legacy/round icon densities and padded adaptive
+foregrounds, install ImageMagick 7 and run:
+
+```sh
+bash scripts/android/generate-icons.sh
+```
+
+The adaptive background layer is transparent. Launchers can apply their own
+mask, background treatment or themed rendering; identical appearance on every
+device is not guaranteed. No signing, version increment or store publication is
+performed by the icon-generation script.
+
 ## Official references
 
 - https://capacitorjs.com/docs/getting-started/environment-setup
