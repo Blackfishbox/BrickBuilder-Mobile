@@ -207,7 +207,6 @@
 .dark .modal-scrim,
 .dark .sm-overlay { background: rgba(0, 0, 0, .62); }
 .dark .drawer-handle { background: hsl(var(--muted-foreground)); }
-.dark .project-dot { box-shadow: 0 0 0 3px rgba(215, 91, 63, .18); }
 .dark .color-evidence-status { color: hsl(var(--foreground)); }
 .dark .popover-action { border-bottom-color: hsl(var(--border)); }
 .dark .saved-projects { border-top-color: hsl(var(--border)); }

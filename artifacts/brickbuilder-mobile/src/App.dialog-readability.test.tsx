@@ -407,6 +407,14 @@ it("keeps keyboard focus visible through the project menu at 200% text size on a
   expect(documentRef.activeElement).toBe(opener);
 });
 
+it("shows the menu icon instead of the colored dot in the main menu button", async () => {
+  const container = await mount("light");
+  const menuButton = container.querySelector<HTMLButtonElement>('[data-testid="button-project-menu"]')!;
+
+  expect(menuButton.querySelector(".project-dot")).toBeNull();
+  expect(menuButton.querySelector("svg")).not.toBeNull();
+});
+
 it("keeps keyboard focus visible in the parts drawer and restores its opener on Escape", async () => {
   const container = await mount("light", false, "en", { viewport: { width: 320, height: 280 } });
   textScaleStyle = documentRef.createElement("style");

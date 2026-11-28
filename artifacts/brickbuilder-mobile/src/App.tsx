@@ -581,7 +581,7 @@ function App() {
             aria-controls="project-menu"
             data-testid="button-project-menu"
           >
-            <span className="project-dot" />
+            <CONTROL_SYMBOLS.projectMenu size={18} aria-hidden="true" />
             <span className="project-title" data-testid="text-project-name">{displayedProjectName}</span>
             <ChevronDown size={15} />
           </button>

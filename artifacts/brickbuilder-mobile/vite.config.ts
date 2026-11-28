@@ -39,7 +39,7 @@ export default defineConfig({
     VitePWA({
       disable: process.env.VITE_NATIVE_ANDROID === 'true',
       registerType: 'autoUpdate',
-      includeAssets: ['icons/brickbuilder-192.png', 'icons/brickbuilder-512.png'],
+      includeAssets: ['favicon.svg', 'icons/brickbuilder-192.png', 'icons/brickbuilder-512.png'],
       manifest: {
         name: 'BrickBuilder',
         short_name: 'BrickBuilder',

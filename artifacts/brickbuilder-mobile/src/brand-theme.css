@@ -40,7 +40,6 @@
 .gesture-guide-sections h3 { color: hsl(var(--brand-highlight)); }
 .saved-project:hover, .tool-segment { background: hsl(var(--muted)); }
 .saved-project small, .no-saved-projects { color: hsl(var(--muted-foreground)); }
-.project-dot { background: hsl(var(--brand-highlight)); box-shadow: 0 0 0 3px hsl(var(--brand-highlight) / .12); }
 .save-button, .dock-parts {
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));

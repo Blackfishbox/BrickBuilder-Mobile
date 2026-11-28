@@ -112,7 +112,6 @@
   border-radius: 9px; padding: 9px 10px; cursor: pointer; max-width: 290px;
 }
 .project-title-button:hover { background: rgba(48,68,62,.06); }
-.project-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #d75b3f; box-shadow: 0 0 0 3px rgba(215,91,63,.12); }
 .project-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
 .project-title-button > svg { color: #7a8981; flex: none; }
 .topbar-end { display: flex; align-items: center; gap: 16px; margin-left: auto; }
